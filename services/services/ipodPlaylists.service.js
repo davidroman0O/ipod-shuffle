@@ -1,7 +1,5 @@
 "use strict";
 
-const { resolveSelectedPlaylist, tracksForPlaylist } = require("../lib/view-models");
-
 /**
  * ipodPlaylists
  * -------------
@@ -140,26 +138,6 @@ module.exports = {
 				const playlist = await ctx.call("ipodPlaylistsDb.removeTrack", ctx.params);
 				await ctx.emit("ipod.playlists.tracks.changed", { playlistId: playlist.id });
 				return playlist;
-			}
-		},
-
-		workbench: {
-			params: { selectedId: { type: "string", optional: true } },
-			async handler(ctx) {
-				const [playlists, tracks, roots] = await Promise.all([
-					ctx.call("ipodPlaylists.list"),
-					ctx.call("ipodLibrary.listTracks").catch(() => []),
-					ctx.call("ipodLibrary.listRoots").catch(() => [])
-				]);
-				const selected = resolveSelectedPlaylist(playlists, ctx.params.selectedId);
-				return {
-					playlists,
-					tracks,
-					roots,
-					selected,
-					selectedId: selected ? selected.id : null,
-					selectedTracks: tracksForPlaylist(selected, tracks)
-				};
 			}
 		}
 	}

@@ -7,9 +7,9 @@ const request = require("supertest");
 const ApiService = require("../../services/api.service");
 const TracksDbService = require("../../services/ipodTracksDb.db.service");
 const PlaylistsDbService = require("../../services/ipodPlaylistsDb.db.service");
+const PlaylistsService = require("../../services/ipodPlaylists.service");
 const LibraryRootsDbService = require("../../services/ipodLibraryRootsDb.db.service");
 const LibraryService = require("../../services/ipodLibrary.service");
-const EngineService = require("../../services/ipodEngine.service");
 
 // Stub the engine so these tests never hit a real HTTP server.
 function makeStubEngineService(responses) {
@@ -18,9 +18,16 @@ function makeStubEngineService(responses) {
 		actions: {
 			health: { handler: () => responses.health || { ok: true } },
 			discover: { handler: () => responses.discover || [] },
-			inspect: { handler: (ctx) => responses.inspect ? responses.inspect(ctx.params) : { id: "stub" } },
-			syncPlan: { handler: (ctx) => responses.syncPlan ? responses.syncPlan(ctx.params) : {} },
-			sync: { handler: (ctx) => responses.sync ? responses.sync(ctx.params) : { syncedAt: "x", manifest: [] } }
+			inspect: {
+				handler: ctx => (responses.inspect ? responses.inspect(ctx.params) : { id: "stub" })
+			},
+			syncPlan: {
+				handler: ctx => (responses.syncPlan ? responses.syncPlan(ctx.params) : {})
+			},
+			sync: {
+				handler: ctx =>
+					responses.sync ? responses.sync(ctx.params) : { syncedAt: "x", manifest: [] }
+			}
 		}
 	};
 }
@@ -33,6 +40,7 @@ describe("Test 'api' gateway over ipod services", () => {
 		broker = new ServiceBroker({ logger: false });
 		broker.createService(TracksDbService);
 		broker.createService(PlaylistsDbService);
+		broker.createService(PlaylistsService);
 		broker.createService(LibraryRootsDbService);
 		broker.createService(LibraryService);
 		broker.createService(makeStubEngineService({}));
@@ -59,7 +67,7 @@ describe("Test 'api' gateway over ipod services", () => {
 		expect(create.body.name).toBe("Rock");
 
 		const list = await request(server).get("/api/playlists");
-		expect(list.body.map((p) => p.name)).toContain("Rock");
+		expect(list.body.map(p => p.name)).toContain("Rock");
 	});
 
 	it("should list library roots (empty initially)", async () => {

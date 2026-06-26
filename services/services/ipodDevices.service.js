@@ -1,7 +1,5 @@
 "use strict";
 
-const { progressPercent, splitPlaylistAssignments } = require("../lib/view-models");
-
 /**
  * ipodDevices
  * -----------
@@ -51,19 +49,6 @@ module.exports = {
 				}
 				await ctx.emit("ipod.devices.refreshed", { total: discovered.length, created });
 				return { devices: upserted, created };
-			}
-		},
-
-		/**
-		 * UI-friendly device list: refresh discovery, then attach an online map.
-		 * The web gateway consumes this public action instead of composing DB
-		 * reads itself.
-		 */
-		listWithStatus: {
-			async handler(ctx) {
-				const result = await ctx.call("ipodDevices.refresh");
-				const online = await this.buildOnlineMap(ctx, result.devices);
-				return { ...result, online };
 			}
 		},
 
@@ -156,48 +141,6 @@ module.exports = {
 		},
 
 		/**
-		 * Device detail view model for HTML or JSON callers: device document,
-		 * playlist assignment split, online status, and current sync job.
-		 */
-		detail: {
-			params: { deviceId: { type: "string", required: true } },
-			/** @param {Context} ctx */
-			async handler(ctx) {
-				const deviceId = ctx.params.deviceId;
-				const [device, playlists, online, job] = await Promise.all([
-					ctx.call("ipodDevicesDb.get", { id: deviceId }),
-					ctx.call("ipodPlaylists.list").catch(() => []),
-					ctx.call("ipodDevices.isOnline", { deviceId }).catch(() => false),
-					ctx.call("ipodSync.status", { deviceId }).catch(() => null)
-				]);
-				const { assigned, unassigned } = splitPlaylistAssignments(device, playlists);
-				return {
-					device,
-					playlists,
-					online: !!online,
-					assigned,
-					unassigned,
-					job,
-					pct: progressPercent(job)
-				};
-			}
-		},
-
-		/** Device + current sync job, used by polling fragments. */
-		syncState: {
-			params: { deviceId: { type: "string", required: true } },
-			/** @param {Context} ctx */
-			async handler(ctx) {
-				const deviceId = ctx.params.deviceId;
-				const [device, job] = await Promise.all([
-					ctx.call("ipodDevicesDb.get", { id: deviceId }),
-					ctx.call("ipodSync.status", { deviceId })
-				]);
-				return { device, job, pct: progressPercent(job) };
-			}
-		},
-
-		/**
 		 * Report whether a device is currently online (mounted & discovered).
 		 */
 		isOnline: {
@@ -226,24 +169,6 @@ module.exports = {
 				await ctx.emit("ipod.devices.removed", { deviceId: ctx.params.deviceId });
 				return removed;
 			}
-		}
-	},
-
-	methods: {
-		async buildOnlineMap(ctx, devices) {
-			const online = {};
-			await Promise.all(
-				(devices || []).map(async device => {
-					try {
-						online[device.id] = await ctx.call("ipodDevices.isOnline", {
-							deviceId: device.id
-						});
-					} catch {
-						online[device.id] = false;
-					}
-				})
-			);
-			return online;
 		}
 	}
 };
