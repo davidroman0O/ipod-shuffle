@@ -1,5 +1,7 @@
 "use strict";
 
+const { progressPercent, splitPlaylistAssignments } = require("../lib/view-models");
+
 /**
  * ipodDevices
  * -----------
@@ -21,8 +23,7 @@ module.exports = {
 	actions: {
 		/**
 		 * Discover mounted iPods via the engine and upsert each into
-		 * ipodDevicesDb. Emits `ipod.devices.changed` when the set differs from
-		 * what was last seen (caller-visible signal for the mesh).
+		 * ipodDevicesDb. Emits `ipod.devices.refreshed` as a mesh-visible signal.
 		 */
 		refresh: {
 			async handler(ctx) {
@@ -30,13 +31,17 @@ module.exports = {
 				// Index the live engine data by mount path so we can attach fresh
 				// capacity (totalBytes/freeBytes) to each device in the response —
 				// this is authoritative even if the persisted record is stale.
-				const liveByMount = new Map(discovered.map((d) => [d.mountPath, d]));
+				const liveByMount = new Map(discovered.map(d => [d.mountPath, d]));
 				const upserted = [];
 				let created = 0;
 				for (const device of discovered) {
-					const result = await ctx.call("ipodDevicesDb.upsertFromDiscovery", { discovered: device });
+					const result = await ctx.call("ipodDevicesDb.upsertFromDiscovery", {
+						discovered: device
+					});
 					// Attach live capacity so the UI always sees current disk usage.
-					const live = liveByMount.get(result.device.lastKnownMountPath || result.device.preferredMountPath);
+					const live = liveByMount.get(
+						result.device.lastKnownMountPath || result.device.preferredMountPath
+					);
 					upserted.push({
 						...result.device,
 						totalBytes: live?.totalBytes ?? result.device.totalBytes,
@@ -50,6 +55,19 @@ module.exports = {
 		},
 
 		/**
+		 * UI-friendly device list: refresh discovery, then attach an online map.
+		 * The web gateway consumes this public action instead of composing DB
+		 * reads itself.
+		 */
+		listWithStatus: {
+			async handler(ctx) {
+				const result = await ctx.call("ipodDevices.refresh");
+				const online = await this.buildOnlineMap(ctx, result.devices);
+				return { ...result, online };
+			}
+		},
+
+		/**
 		 * Manually register a device at a mount path (inspects it via the engine,
 		 * then upserts). Used when auto-discovery misses a volume.
 		 */
@@ -57,8 +75,11 @@ module.exports = {
 			params: { mountPath: { type: "string", required: true } },
 			/** @param {Context} ctx */
 			async handler(ctx) {
-				const discovered = await ctx.call("ipodEngine.inspect", { mountPath: ctx.params.mountPath });
+				const discovered = await ctx.call("ipodEngine.inspect", {
+					mountPath: ctx.params.mountPath
+				});
 				const result = await ctx.call("ipodDevicesDb.upsertFromDiscovery", { discovered });
+				await ctx.emit("ipod.devices.registered", { deviceId: result.device.id });
 				return result.device;
 			}
 		},
@@ -71,10 +92,108 @@ module.exports = {
 			},
 			/** @param {Context} ctx */
 			async handler(ctx) {
-				return ctx.call("ipodDevicesDb.togglePlaylistAssignment", {
+				const device = await ctx.call("ipodDevicesDb.togglePlaylistAssignment", {
 					deviceId: ctx.params.deviceId,
 					playlistId: ctx.params.playlistId
 				});
+				await ctx.emit("ipod.devices.playlists.changed", {
+					deviceId: ctx.params.deviceId,
+					playlistId: ctx.params.playlistId
+				});
+				return device;
+			}
+		},
+
+		/** Set the full playlist sync order for a device. */
+		setPlaylistOrder: {
+			params: {
+				deviceId: { type: "string", required: true },
+				playlistIds: { type: "array", items: "string", default: [] }
+			},
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				const device = await ctx.call("ipodDevicesDb.setPlaylistOrder", {
+					deviceId: ctx.params.deviceId,
+					playlistIds: ctx.params.playlistIds
+				});
+				await ctx.emit("ipod.devices.playlists.reordered", {
+					deviceId: ctx.params.deviceId,
+					playlistIds: ctx.params.playlistIds
+				});
+				return device;
+			}
+		},
+
+		/** Remove one playlist from every device assignment list. */
+		unassignPlaylistEverywhere: {
+			params: { playlistId: { type: "string", required: true } },
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				const devices = await ctx.call("ipodDevicesDb.listAll");
+				const changed = [];
+				for (const device of devices) {
+					if (
+						!Array.isArray(device.playlistIds) ||
+						!device.playlistIds.includes(ctx.params.playlistId)
+					) {
+						continue;
+					}
+					const next = device.playlistIds.filter(id => id !== ctx.params.playlistId);
+					const updated = await ctx.call("ipodDevicesDb.setPlaylistOrder", {
+						deviceId: device.id,
+						playlistIds: next
+					});
+					changed.push(updated.id);
+				}
+				if (changed.length) {
+					await ctx.emit("ipod.devices.playlists.changed", {
+						playlistId: ctx.params.playlistId,
+						deviceIds: changed
+					});
+				}
+				return { changed };
+			}
+		},
+
+		/**
+		 * Device detail view model for HTML or JSON callers: device document,
+		 * playlist assignment split, online status, and current sync job.
+		 */
+		detail: {
+			params: { deviceId: { type: "string", required: true } },
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				const deviceId = ctx.params.deviceId;
+				const [device, playlists, online, job] = await Promise.all([
+					ctx.call("ipodDevicesDb.get", { id: deviceId }),
+					ctx.call("ipodPlaylists.list").catch(() => []),
+					ctx.call("ipodDevices.isOnline", { deviceId }).catch(() => false),
+					ctx.call("ipodSync.status", { deviceId }).catch(() => null)
+				]);
+				const { assigned, unassigned } = splitPlaylistAssignments(device, playlists);
+				return {
+					device,
+					playlists,
+					online: !!online,
+					assigned,
+					unassigned,
+					job,
+					pct: progressPercent(job)
+				};
+			}
+		},
+
+		/** Device + current sync job, used by polling fragments. */
+		syncState: {
+			params: { deviceId: { type: "string", required: true } },
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				const deviceId = ctx.params.deviceId;
+				const [device, job] = await Promise.all([
+					ctx.call("ipodDevicesDb.get", { id: deviceId }),
+					ctx.call("ipodSync.status", { deviceId })
+				]);
+				return { device, job, pct: progressPercent(job) };
 			}
 		},
 
@@ -89,7 +208,7 @@ module.exports = {
 				if (!device) return false;
 				const discovered = await ctx.call("ipodEngine.discover");
 				return discovered.some(
-					(d) =>
+					d =>
 						(device.volumeUuid && d.volumeUuid === device.volumeUuid) ||
 						(device.lastKnownMountPath && d.mountPath === device.lastKnownMountPath)
 				);
@@ -101,8 +220,30 @@ module.exports = {
 			params: { deviceId: { type: "string", required: true } },
 			/** @param {Context} ctx */
 			async handler(ctx) {
-				return ctx.call("ipodDevicesDb.removeById", { id: ctx.params.deviceId });
+				const removed = await ctx.call("ipodDevicesDb.removeById", {
+					id: ctx.params.deviceId
+				});
+				await ctx.emit("ipod.devices.removed", { deviceId: ctx.params.deviceId });
+				return removed;
 			}
+		}
+	},
+
+	methods: {
+		async buildOnlineMap(ctx, devices) {
+			const online = {};
+			await Promise.all(
+				(devices || []).map(async device => {
+					try {
+						online[device.id] = await ctx.call("ipodDevices.isOnline", {
+							deviceId: device.id
+						});
+					} catch {
+						online[device.id] = false;
+					}
+				})
+			);
+			return online;
 		}
 	}
 };

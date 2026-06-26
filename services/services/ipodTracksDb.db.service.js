@@ -1,7 +1,6 @@
 "use strict";
 
 const DbMixin = require("../mixins/db.mixin");
-const { MoleculerError } = require("moleculer").Errors;
 
 /**
  * ipodTracksDb
@@ -62,8 +61,8 @@ module.exports = {
 				// Use findEntities (not adapter.find) so docs are field-transformed
 				// (raw adapter output has _id, not id — which would break the Map below).
 				const docs = await this.findEntities(ctx, { query: { _id: { $in: ids } } });
-				const byId = new Map(docs.map((d) => [d.id, d]));
-				return ids.map((id) => byId.get(id)).filter(Boolean);
+				const byId = new Map(docs.map(d => [d.id, d]));
+				return ids.map(id => byId.get(id)).filter(Boolean);
 			}
 		},
 
@@ -131,11 +130,18 @@ module.exports = {
 	methods: {
 		/** Core upsert keyed on sourcePath. */
 		async upsertByPath(ctx, params) {
-			const existing = await this.findEntity(ctx, { query: { sourcePath: params.sourcePath } });
+			const existing = await this.findEntity(ctx, {
+				query: { sourcePath: params.sourcePath }
+			});
 			const now = this.now();
 			if (!existing) {
 				return {
-					track: await this.createEntity(ctx, { ...params, exists: true, addedAt: now, updatedAt: now }),
+					track: await this.createEntity(ctx, {
+						...params,
+						exists: true,
+						addedAt: now,
+						updatedAt: now
+					}),
 					created: true
 				};
 			}

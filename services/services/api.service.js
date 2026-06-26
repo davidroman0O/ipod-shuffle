@@ -35,7 +35,7 @@ module.exports = {
 					"GET /devices": "ipodDevices.refresh",
 					"POST /devices/register": "ipodDevices.register",
 					"POST /devices/:deviceId/playlists/:playlistId": "ipodDevices.assignPlaylist",
-					"POST /devices/:deviceId/order": "ipodDevicesDb.setPlaylistOrder",
+					"POST /devices/:deviceId/order": "ipodDevices.setPlaylistOrder",
 					"GET /devices/:deviceId/online": "ipodDevices.isOnline",
 					"DELETE /devices/:deviceId": "ipodDevices.remove",
 
@@ -47,24 +47,24 @@ module.exports = {
 					"POST /library/revalidate": "ipodLibrary.revalidate",
 					"POST /library/tracks": "ipodLibrary.addTrack",
 					"POST /library/tracks/batch": "ipodLibrary.addTracks",
-					"GET /tracks": "ipodTracksDb.find",
+					"GET /tracks": "ipodLibrary.listTracks",
 
 					// Filesystem browsing (server-side directory picker for the UI).
 					"GET /fs/list": "ipodFs.list",
 					"POST /fs/expand": "ipodFs.expand",
 
 					// Playlists.
-					"GET /playlists": "ipodPlaylistsDb.listOrdered",
-					"POST /playlists": "ipodPlaylistsDb.createNamed",
-					"GET /playlists/:id": "ipodPlaylistsDb.get",
-					"PATCH /playlists/:id": "ipodPlaylistsDb.rename",
-					"DELETE /playlists/:id": "ipodPlaylistsDb.removeWithAssignments",
-					"POST /playlists/order": "ipodPlaylistsDb.setOrder",
-					"POST /playlists/:id/order": "ipodPlaylistsDb.setTrackOrder",
-					"POST /playlists/:id/tracks": "ipodPlaylistsDb.addTracks",
-					"POST /playlists/:id/insert": "ipodPlaylistsDb.insertTracks",
-					"POST /playlists/:id/tracks/:trackId": "ipodPlaylistsDb.addTrack",
-					"DELETE /playlists/:id/tracks/:trackId": "ipodPlaylistsDb.removeTrack",
+					"GET /playlists": "ipodPlaylists.list",
+					"POST /playlists": "ipodPlaylists.create",
+					"GET /playlists/:id": "ipodPlaylists.get",
+					"PATCH /playlists/:id": "ipodPlaylists.rename",
+					"DELETE /playlists/:id": "ipodPlaylists.remove",
+					"POST /playlists/order": "ipodPlaylists.setOrder",
+					"POST /playlists/:id/order": "ipodPlaylists.setTrackOrder",
+					"POST /playlists/:id/tracks": "ipodPlaylists.addTracks",
+					"POST /playlists/:id/insert": "ipodPlaylists.insertTracks",
+					"POST /playlists/:id/tracks/:trackId": "ipodPlaylists.addTrack",
+					"DELETE /playlists/:id/tracks/:trackId": "ipodPlaylists.removeTrack",
 
 					// Sync.
 					"GET /sync/:deviceId/resolve": "ipodSync.resolve",
@@ -86,7 +86,6 @@ module.exports = {
 		],
 		log4XXResponses: false,
 		logRequestParams: null,
-		logResponseData: null,
-		assets: { folder: "public", options: {} }
+		logResponseData: null
 	}
 };

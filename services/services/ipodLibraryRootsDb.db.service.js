@@ -44,7 +44,7 @@ module.exports = {
 		listPaths: {
 			async handler(ctx) {
 				const docs = await this.findEntities(ctx, {});
-				return docs.map((d) => d.path);
+				return docs.map(d => d.path);
 			}
 		},
 

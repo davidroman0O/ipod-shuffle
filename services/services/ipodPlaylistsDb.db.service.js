@@ -54,11 +54,19 @@ module.exports = {
 			async handler(ctx) {
 				const trimmed = ctx.params.name.trim().replace(/\s+/g, " ");
 				if (!trimmed) throw new MoleculerError("Playlist name cannot be empty.", 422);
-				const clash = await this.findEntity(ctx, { query: { name: new RegExp(`^${escapeRegex(trimmed)}$`, "i") } });
+				const clash = await this.findEntity(ctx, {
+					query: { name: new RegExp(`^${escapeRegex(trimmed)}$`, "i") }
+				});
 				if (clash) throw new MoleculerError(`Playlist "${trimmed}" already exists.`, 409);
 				const position = await this.nextPosition(ctx);
 				const now = this.now();
-				return this.createEntity(ctx, { name: trimmed, trackIds: [], position, createdAt: now, updatedAt: now });
+				return this.createEntity(ctx, {
+					name: trimmed,
+					trackIds: [],
+					position,
+					createdAt: now,
+					updatedAt: now
+				});
 			}
 		},
 
@@ -95,7 +103,12 @@ module.exports = {
 			},
 			/** @param {Context} ctx */
 			async handler(ctx) {
-				return this.insertTracksIntoPlaylist(ctx, ctx.params.id, ctx.params.trackIds, ctx.params.position);
+				return this.insertTracksIntoPlaylist(
+					ctx,
+					ctx.params.id,
+					ctx.params.trackIds,
+					ctx.params.position
+				);
 			}
 		},
 
@@ -152,26 +165,11 @@ module.exports = {
 				if (clash && clash.id !== ctx.params.id) {
 					throw new MoleculerError(`Playlist "${trimmed}" already exists.`, 409);
 				}
-				return this.updateEntity(ctx, { id: ctx.params.id, name: trimmed, updatedAt: this.now() });
-			}
-		},
-
-		/** Delete a playlist and clear its assignment on every device. */
-		removeWithAssignments: {
-			params: { id: { type: "string", required: true } },
-			/** @param {Context} ctx */
-			async handler(ctx) {
-				const devices = await ctx.call("ipodDevicesDb.listAll");
-				const id = ctx.params.id;
-				for (const device of devices) {
-					if (Array.isArray(device.playlistIds) && device.playlistIds.includes(id)) {
-						await ctx.call("ipodDevicesDb.update", {
-							id: device.id,
-							playlistIds: device.playlistIds.filter((p) => p !== id)
-						});
-					}
-				}
-				return this.removeEntity(ctx, { id });
+				return this.updateEntity(ctx, {
+					id: ctx.params.id,
+					name: trimmed,
+					updatedAt: this.now()
+				});
 			}
 		},
 
@@ -235,7 +233,11 @@ module.exports = {
 					existing.add(id);
 				}
 			}
-			return this.updateEntity(ctx, { id: playlistId, trackIds: next, updatedAt: this.now() });
+			return this.updateEntity(ctx, {
+				id: playlistId,
+				trackIds: next,
+				updatedAt: this.now()
+			});
 		},
 
 		/** Insert ids at a position (deduped; -1 = append). */
@@ -244,11 +246,15 @@ module.exports = {
 			if (!playlist) throw new MoleculerError("Playlist not found.", 404);
 			// Dedupe: drop ids already present, then insert the rest at position.
 			const existing = new Set(playlist.trackIds);
-			const fresh = trackIds.filter((id) => !existing.has(id));
+			const fresh = trackIds.filter(id => !existing.has(id));
 			const next = [...playlist.trackIds];
 			const at = position < 0 || position > next.length ? next.length : position;
 			next.splice(at, 0, ...fresh);
-			return this.updateEntity(ctx, { id: playlistId, trackIds: next, updatedAt: this.now() });
+			return this.updateEntity(ctx, {
+				id: playlistId,
+				trackIds: next,
+				updatedAt: this.now()
+			});
 		},
 
 		async removeTrackFromPlaylist(ctx, playlistId, trackId) {
@@ -256,7 +262,7 @@ module.exports = {
 			if (!playlist) throw new MoleculerError("Playlist not found.", 404);
 			return this.updateEntity(ctx, {
 				id: playlistId,
-				trackIds: playlist.trackIds.filter((id) => id !== trackId),
+				trackIds: playlist.trackIds.filter(id => id !== trackId),
 				updatedAt: this.now()
 			});
 		},

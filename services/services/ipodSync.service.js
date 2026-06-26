@@ -1,6 +1,6 @@
 "use strict";
 
-const { EngineClient } = require("../lib/engine-client");
+const { MoleculerError } = require("moleculer").Errors;
 
 /**
  * ipodSync
@@ -36,7 +36,10 @@ module.exports = {
 		plan: {
 			params: { deviceId: { type: "string", required: true } },
 			async handler(ctx) {
-				const { device, tracks, playlists } = await this.resolveDevice(ctx, ctx.params.deviceId);
+				const { device, tracks, playlists } = await this.resolveDevice(
+					ctx,
+					ctx.params.deviceId
+				);
 				return ctx.call("ipodEngine.syncPlan", {
 					mountPath: device.lastKnownMountPath,
 					tracks,
@@ -53,9 +56,15 @@ module.exports = {
 		run: {
 			params: { deviceId: { type: "string", required: true } },
 			async handler(ctx) {
-				const { device, tracks, playlists } = await this.resolveDevice(ctx, ctx.params.deviceId);
+				const { device, tracks, playlists } = await this.resolveDevice(
+					ctx,
+					ctx.params.deviceId
+				);
 				if (!device.lastKnownMountPath) {
-					throw new MoleculerError(`Device "${device.name}" is not currently mounted.`, 409);
+					throw new MoleculerError(
+						`Device "${device.name}" is not currently mounted.`,
+						409
+					);
 				}
 				if (this.jobs.has(device.id) && this.jobs.get(device.id).status === "running") {
 					throw new MoleculerError(`A sync is already running on "${device.name}".`, 409);
@@ -78,14 +87,17 @@ module.exports = {
 				this.jobs.set(device.id, job);
 
 				// Detach the background task — the handler returns immediately.
-				this.runSyncTask(ctx, device, tracks, playlists).catch((err) => {
+				this.runSyncTask(ctx, device, tracks, playlists).catch(err => {
 					this.logger.error(`sync task crashed: ${err.message}`);
 					job.status = "failed";
 					job.error = err.message;
 					job.finishedAt = new Date().toISOString();
 				});
 
-				await ctx.emit("ipod.sync.started", { deviceId: device.id, trackCount: tracks.length });
+				await ctx.emit("ipod.sync.started", {
+					deviceId: device.id,
+					trackCount: tracks.length
+				});
 				return { deviceId: device.id, status: "running" };
 			}
 		},
@@ -94,7 +106,12 @@ module.exports = {
 		status: {
 			params: { deviceId: { type: "string", required: true } },
 			async handler(ctx) {
-				return this.jobs.get(ctx.params.deviceId) ?? { deviceId: ctx.params.deviceId, status: "idle" };
+				return (
+					this.jobs.get(ctx.params.deviceId) ?? {
+						deviceId: ctx.params.deviceId,
+						status: "idle"
+					}
+				);
 			}
 		},
 
@@ -164,7 +181,10 @@ module.exports = {
 					job.error = err.message;
 				}
 				job.finishedAt = new Date().toISOString();
-				await ctx.emit("ipod.sync.failed", { deviceId: device.id, error: job.error || "cancelled" });
+				await ctx.emit("ipod.sync.failed", {
+					deviceId: device.id,
+					error: job.error || "cancelled"
+				});
 			} finally {
 				this.controllers.delete(device.id);
 			}
@@ -211,7 +231,7 @@ module.exports = {
 
 			const playlistIds = device.playlistIds || [];
 			const playlists = playlistIds.length
-				? await ctx.call("ipodPlaylistsDb.resolveByIds", { ids: playlistIds })
+				? await ctx.call("ipodPlaylists.resolveByIds", { ids: playlistIds })
 				: [];
 
 			const seen = new Set();
@@ -225,22 +245,24 @@ module.exports = {
 				}
 			}
 
-			const tracks = trackIds.length ? await ctx.call("ipodTracksDb.resolveByIds", { ids: trackIds }) : [];
-			const trackExists = new Set(tracks.filter((t) => t.exists).map((t) => t.id));
+			const tracks = trackIds.length
+				? await ctx.call("ipodTracksDb.resolveByIds", { ids: trackIds })
+				: [];
+			const trackExists = new Set(tracks.filter(t => t.exists).map(t => t.id));
 
 			const engineTracks = tracks
-				.filter((t) => t.exists)
-				.map((t) => ({
+				.filter(t => t.exists)
+				.map(t => ({
 					trackId: t.id,
 					sourcePath: t.sourcePath,
 					fileName: t.fileName,
 					sizeBytes: t.sizeBytes
 				}));
 
-			const enginePlaylists = playlists.map((playlist) => ({
+			const enginePlaylists = playlists.map(playlist => ({
 				playlistId: playlist.id,
 				name: playlist.name,
-				trackIds: (playlist.trackIds || []).filter((id) => trackExists.has(id))
+				trackIds: (playlist.trackIds || []).filter(id => trackExists.has(id))
 			}));
 
 			return { device, tracks: engineTracks, playlists: enginePlaylists };
@@ -253,5 +275,3 @@ module.exports = {
 		this.controllers = new Map();
 	}
 };
-
-const { MoleculerError } = require("moleculer").Errors;

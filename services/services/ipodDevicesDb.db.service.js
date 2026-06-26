@@ -96,9 +96,24 @@ module.exports = {
 				if (!device) throw new MoleculerError("Device not found.", 404);
 				const has = device.playlistIds.includes(ctx.params.playlistId);
 				const next = has
-					? device.playlistIds.filter((id) => id !== ctx.params.playlistId)
+					? device.playlistIds.filter(id => id !== ctx.params.playlistId)
 					: [...device.playlistIds, ctx.params.playlistId];
 				return this.updateEntity(ctx, { id: ctx.params.deviceId, playlistIds: next });
+			}
+		},
+
+		/** Reorder the playlist sync order for a device (full ordered id list). */
+		setPlaylistOrder: {
+			params: {
+				deviceId: { type: "string", required: true },
+				playlistIds: { type: "array", items: "string", default: [] }
+			},
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				return this.updateEntity(ctx, {
+					id: ctx.params.deviceId,
+					playlistIds: ctx.params.playlistIds
+				});
 			}
 		},
 
@@ -163,14 +178,18 @@ module.exports = {
 		/** Match an existing device by UUID, preferred, or last-known mount path. */
 		async findExisting(ctx, discovered) {
 			if (discovered.volumeUuid) {
-				const byUuid = await this.findEntity(ctx, { query: { volumeUuid: discovered.volumeUuid } });
+				const byUuid = await this.findEntity(ctx, {
+					query: { volumeUuid: discovered.volumeUuid }
+				});
 				if (byUuid) return byUuid;
 			}
 			const byMount = await this.findEntity(ctx, {
-				query: { $or: [
-					{ preferredMountPath: discovered.mountPath },
-					{ lastKnownMountPath: discovered.mountPath }
-				] }
+				query: {
+					$or: [
+						{ preferredMountPath: discovered.mountPath },
+						{ lastKnownMountPath: discovered.mountPath }
+					]
+				}
 			});
 			return byMount;
 		},

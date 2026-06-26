@@ -27,14 +27,14 @@ module.exports = {
 	actions: {
 		/** Check engine liveness. */
 		health: {
-			async handler(ctx) {
+			async handler() {
 				return this.engine.health();
 			}
 		},
 
 		/** Scan the volumes root for iPod Shuffle volumes. */
 		discover: {
-			async handler(ctx) {
+			async handler() {
 				return this.engine.discover();
 			}
 		},

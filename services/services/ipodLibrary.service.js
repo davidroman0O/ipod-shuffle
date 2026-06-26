@@ -48,12 +48,26 @@ module.exports = {
 			}
 		},
 
+		/** List tracked library files, sorted for UI consumption. */
+		listTracks: {
+			async handler(ctx) {
+				const tracks = await ctx.call("ipodTracksDb.listAll");
+				return tracks.sort((a, b) => {
+					const left = a.fileName || a.sourcePath || "";
+					const right = b.fileName || b.sourcePath || "";
+					return left.localeCompare(right);
+				});
+			}
+		},
+
 		/** Remove a library root by path. Does NOT delete imported tracks. */
 		removeRoot: {
 			params: { path: { type: "string", required: true } },
 			/** @param {Context} ctx */
 			async handler(ctx) {
-				const removed = await ctx.call("ipodLibraryRootsDb.removeByPath", { path: ctx.params.path });
+				const removed = await ctx.call("ipodLibraryRootsDb.removeByPath", {
+					path: ctx.params.path
+				});
 				return { removed };
 			}
 		},
@@ -79,7 +93,12 @@ module.exports = {
 				for (const track of tracks) {
 					try {
 						const stats = await statAudio(track.sourcePath, fs);
-						if (!stats.isFile || stats.size !== track.sizeBytes || stats.mtimeMs !== track.modifiedAtMs || !track.exists) {
+						if (
+							!stats.isFile ||
+							stats.size !== track.sizeBytes ||
+							stats.mtimeMs !== track.modifiedAtMs ||
+							!track.exists
+						) {
 							await ctx.call("ipodTracksDb.refresh", {
 								id: track.id,
 								sizeBytes: stats.size,
@@ -87,7 +106,7 @@ module.exports = {
 							});
 							changed++;
 						}
-					} catch (err) {
+					} catch {
 						if (track.exists) {
 							await ctx.call("ipodTracksDb.markMissing", { id: track.id });
 							changed++;
@@ -105,10 +124,14 @@ module.exports = {
 			async handler(ctx) {
 				const fs = this.fs;
 				if (!isSupportedAudioPath(ctx.params.sourcePath)) {
-					throw new MoleculerError(`Unsupported audio file: ${ctx.params.sourcePath}`, 422);
+					throw new MoleculerError(
+						`Unsupported audio file: ${ctx.params.sourcePath}`,
+						422
+					);
 				}
 				const stats = await statAudio(ctx.params.sourcePath, fs);
-				if (!stats.isFile) throw new MoleculerError(`Not a file: ${ctx.params.sourcePath}`, 422);
+				if (!stats.isFile)
+					throw new MoleculerError(`Not a file: ${ctx.params.sourcePath}`, 422);
 				return ctx.call("ipodTracksDb.upsertRecord", {
 					sourcePath: ctx.params.sourcePath,
 					fileName: path.basename(ctx.params.sourcePath),
@@ -142,7 +165,7 @@ module.exports = {
 							modifiedAtMs: stats.mtimeMs
 						});
 						tracks.push(result.track);
-					} catch (err) {
+					} catch {
 						// Missing file in a batch drop is non-fatal; skip it.
 					}
 				}
