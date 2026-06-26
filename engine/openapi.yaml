@@ -1,0 +1,177 @@
+openapi: 3.0.3
+info:
+  title: iPod Shuffle Engine API
+  version: 1.0.0
+  description: |
+    Stateless device engine for the iPod Shuffle. Discovers mounted volumes,
+    syncs audio files, and writes the iTunesSD / iTunesStats databases.
+
+    This engine knows nothing about *your* playlists or library — it receives a
+    fully-resolved track/playlist set per request and applies it to a device at
+    a mount path. Product state (your playlists, library roots, device
+    assignments) lives in the Moleculer product layer, which is the sole caller
+    of this API.
+servers:
+  - url: http://127.0.0.1:8765
+    description: local engine (default)
+paths:
+  /v1/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+  /v1/discover:
+    get:
+      summary: Scan the volumes root for iPod Shuffle volumes
+      responses:
+        '200':
+          description: discovered devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Device' }
+  /v1/devices/inspect:
+    get:
+      summary: Inspect a single mount path via the host disk tool
+      parameters:
+        - in: query
+          name: mount
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: inspected device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+        '400': { $ref: '#/components/responses/Error' }
+  /v1/sync/plan:
+    post:
+      summary: Dry-run a sync — report copies/skips/deletes without writing
+      requestBody: { $ref: '#/components/requestBodies/SyncRequest' }
+      responses:
+        '200':
+          description: sync plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlanResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /v1/sync:
+    post:
+      summary: Execute a sync against a device
+      description: |
+        Applies the plan (copy new/changed files, remove orphans, prune empty
+        folders) and writes iTunesSD and iTunesStats to the device. Tracks are
+        assigned on-device paths (F##/S#####) from their order in the request.
+      requestBody: { $ref: '#/components/requestBodies/SyncRequest' }
+      responses:
+        '200':
+          description: sync result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+components:
+  requestBodies:
+    SyncRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SyncRequest' }
+  responses:
+    Error:
+      description: error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    Device:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        mountPath: { type: string }
+        volumeName: { type: string }
+        volumeUuid: { type: string }
+        deviceNode: { type: string }
+        mediaType: { type: string }
+        totalBytes: { type: integer, format: int64 }
+        freeBytes: { type: integer, format: int64 }
+    SyncRequest:
+      type: object
+      required: [mountPath, tracks]
+      properties:
+        mountPath: { type: string }
+        tracks:
+          type: array
+          items: { $ref: '#/components/schemas/TrackInput' }
+        playlists:
+          type: array
+          items: { $ref: '#/components/schemas/PlaylistInput' }
+    TrackInput:
+      type: object
+      required: [trackId, sourcePath, fileName, sizeBytes]
+      properties:
+        trackId: { type: string }
+        sourcePath: { type: string }
+        fileName: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+    PlaylistInput:
+      type: object
+      required: [playlistId, name, trackIds]
+      properties:
+        playlistId: { type: string }
+        name: { type: string }
+        trackIds:
+          type: array
+          items: { type: string }
+    PlanResponse:
+      type: object
+      properties:
+        mountPath: { type: string }
+        trackCount: { type: integer }
+        copies:
+          type: array
+          items:
+            type: object
+            properties:
+              relativePath: { type: string }
+              reason: { type: string }
+        skips: { type: integer }
+        deletes:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+    SyncResponse:
+      type: object
+      properties:
+        syncedAt: { type: string, format: date-time }
+        writtenDatabaseBytes: { type: integer }
+        writtenStatsBytes: { type: integer }
+        manifest:
+          type: array
+          items:
+            type: object
+            properties:
+              trackId: { type: string }
+              relativePath: { type: string }
+              sizeBytes: { type: integer, format: int64 }
+        warnings:
+          type: array
+          items: { type: string }
+    ErrorResponse:
+      type: object
+      properties:
+        error: { type: string }

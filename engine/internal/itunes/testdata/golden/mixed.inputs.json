@@ -1,0 +1,44 @@
+{
+  "description": "mp3(1) + m4a(2) + wav(4) filetype codes, one named playlist + one empty (filtered)",
+  "tracks": [
+    {
+      "trackId": "t1",
+      "sourcePath": "/library/a.mp3",
+      "fileName": "a.mp3",
+      "relativePath": "iPod_Control/Music/F00/S00000.mp3",
+      "databasePath": "/iPod_Control/Music/F00/S00000.mp3",
+      "sizeBytes": 1000
+    },
+    {
+      "trackId": "t2",
+      "sourcePath": "/library/b.m4a",
+      "fileName": "b.m4a",
+      "relativePath": "iPod_Control/Music/F00/S00001.m4a",
+      "databasePath": "/iPod_Control/Music/F00/S00001.m4a",
+      "sizeBytes": 2000
+    },
+    {
+      "trackId": "t3",
+      "sourcePath": "/library/c.wav",
+      "fileName": "c.wav",
+      "relativePath": "iPod_Control/Music/F00/S00002.wav",
+      "databasePath": "/iPod_Control/Music/F00/S00002.wav",
+      "sizeBytes": 3000
+    }
+  ],
+  "playlists": [
+    {
+      "playlistId": "p1",
+      "name": "Chill",
+      "trackIds": [
+        "t1",
+        "t2"
+      ]
+    },
+    {
+      "playlistId": "p2",
+      "name": "Empty",
+      "trackIds": []
+    }
+  ]
+}

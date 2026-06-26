@@ -4,7 +4,20 @@ globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
 alwaysApply: false
 ---
 
-Default to using Bun instead of Node.js.
+## Per-component tooling
+
+This repo has three distinct stacks. Use the tooling native to each:
+
+- **`engine/`** — Go. Use `go build`, `go test ./...`, `go vet`.
+- **`services/`** — Node.js Moleculer node scaffolded via the Moleculer CLI.
+  Use `npm` (the scaffold ships `package-lock.json`), `npm test` (Jest), and
+  `npm run dev` (moleculer-runner). Do NOT use Bun here — it breaks the lockfile
+  and the Jest/Moleculer toolchain.
+- **`golden/`** — TypeScript run via Bun. Use `bun run golden/capture.ts`.
+
+For general TypeScript outside `services/`, default to Bun instead of Node.js.
+
+### Default to using Bun instead of Node.js.
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
 - Use `bun test` instead of `jest` or `vitest`

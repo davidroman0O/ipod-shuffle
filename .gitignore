@@ -1,5 +1,20 @@
-# dependencies (bun install)
+# dependencies
 node_modules
+services/node_modules
+
+# Go build output
+engine/ipod
+*.exe
+*.test
+
+# Go workspace artifacts
+go.work
+go.work.sum
+
+# NeDB / SQLite data files (product state lives in the running mesh, not git)
+services/data
+data
+*.db
 
 # output
 out
@@ -12,8 +27,7 @@ coverage
 
 # logs
 logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+*.log
 
 # dotenv environment variable files
 .env
@@ -27,8 +41,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
-# IntelliJ based IDEs
+# IDEs
 .idea
+.vscode/*
+!services/.vscode/launch.json
 
-# Finder (MacOS) folder config
+# OS
 .DS_Store
