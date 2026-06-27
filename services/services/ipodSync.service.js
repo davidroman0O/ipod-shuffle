@@ -87,7 +87,7 @@ module.exports = {
 				this.jobs.set(device.id, job);
 
 				// Detach the background task — the handler returns immediately.
-				this.runSyncTask(ctx, device, tracks, playlists).catch(err => {
+				this.runSyncTask(device, tracks, playlists).catch(err => {
 					this.logger.error(`sync task crashed: ${err.message}`);
 					job.status = "failed";
 					job.error = err.message;
@@ -133,7 +133,8 @@ module.exports = {
 		 * Background task: calls the engine's streaming /v1/sync endpoint,
 		 * reads NDJSON lines as they arrive, updates the progress store.
 		 */
-		async runSyncTask(ctx, device, tracks, playlists) {
+		async runSyncTask(device, tracks, playlists) {
+			const broker = this.broker;
 			const job = this.jobs.get(device.id);
 			const controller = new AbortController();
 			this.controllers.set(device.id, controller);
@@ -167,11 +168,11 @@ module.exports = {
 					const lines = buffer.split("\n");
 					buffer = lines.pop(); // keep the partial last line
 					for (const line of lines) {
-						if (line.trim()) this.handleEngineEvent(ctx, device, job, JSON.parse(line));
+						if (line.trim()) this.handleEngineEvent(broker, device, job, JSON.parse(line));
 					}
 				}
 				if (buffer.trim()) {
-					this.handleEngineEvent(ctx, device, job, JSON.parse(buffer));
+					this.handleEngineEvent(broker, device, job, JSON.parse(buffer));
 				}
 			} catch (err) {
 				if (err.name === "AbortError") {
@@ -181,7 +182,7 @@ module.exports = {
 					job.error = err.message;
 				}
 				job.finishedAt = new Date().toISOString();
-				await ctx.emit("ipod.sync.failed", {
+				await broker.emit("ipod.sync.failed", {
 					deviceId: device.id,
 					error: job.error || "cancelled"
 				});
@@ -191,7 +192,7 @@ module.exports = {
 		},
 
 		/** Process one NDJSON event from the engine stream. */
-		async handleEngineEvent(ctx, device, job, ev) {
+		async handleEngineEvent(broker, device, job, ev) {
 			if (ev.type === "start") {
 				job.totalCopies = ev.totalCopies || job.total;
 			} else if (ev.type === "progress") {
@@ -208,12 +209,12 @@ module.exports = {
 				};
 				job.finishedAt = new Date().toISOString();
 				// Persist the manifest.
-				await ctx.call("ipodDevicesDb.recordSync", {
+				await broker.call("ipodDevicesDb.recordSync", {
 					deviceId: device.id,
 					manifest: ev.manifest || [],
 					syncedAt: ev.syncedAt
 				});
-				await ctx.emit("ipod.sync.completed", {
+				await broker.emit("ipod.sync.completed", {
 					deviceId: device.id,
 					trackCount: (ev.manifest || []).length
 				});
@@ -221,7 +222,7 @@ module.exports = {
 				job.status = "failed";
 				job.error = ev.error;
 				job.finishedAt = new Date().toISOString();
-				await ctx.emit("ipod.sync.failed", { deviceId: device.id, error: ev.error });
+				await broker.emit("ipod.sync.failed", { deviceId: device.id, error: ev.error });
 			}
 		},
 

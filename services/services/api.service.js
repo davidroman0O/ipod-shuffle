@@ -39,6 +39,7 @@ module.exports = {
 					"POST /devices/:deviceId/order": "ipodDevicesDb.setPlaylistOrder",
 					"POST /devices/:deviceId/name": "ipodDevices.name",
 					"GET /devices/:deviceId/online": "ipodDevices.isOnline",
+					"GET /devices/:deviceId/state": "ipodDevices.state",
 					"DELETE /devices/:deviceId": "ipodDevices.remove",
 					"POST /devices/:deviceId/wipe": "ipodDevices.wipe",
 

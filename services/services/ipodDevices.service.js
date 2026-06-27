@@ -212,6 +212,181 @@ module.exports = {
 					name: ctx.params.name
 				});
 			}
+		},
+
+		/**
+		 * Return the complete device state in a single call — everything the modal
+		 * needs: device info, assignment tree, on-device snapshot, and server-side
+		 * diff. The frontend makes ONE call and renders.
+		 */
+		state: {
+			params: { deviceId: { type: "string", required: true } },
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				return this.getDeviceState(ctx, ctx.params.deviceId);
+			}
+		}
+	},
+
+	methods: {
+		/**
+		 * Assemble the full device state: device record, capacity, identity
+		 * snapshot, assignment tree, and server-computed diff.
+		 */
+		async getDeviceState(ctx, deviceId) {
+			const device = await ctx.call("ipodDevicesDb.get", { id: deviceId });
+			if (!device) throw new MoleculerError("Device not found.", 404);
+
+			// Fetch everything in parallel.
+			const [allPlaylists, allGroups, resolved, online] = await Promise.all([
+				ctx.call("ipodPlaylistsDb.listOrdered"),
+				ctx.call("ipodPlaylistGroupsDb.listOrdered"),
+				ctx.call("ipodSync.resolve", { deviceId }).catch(() => ({ tracks: [], playlists: [] })),
+				ctx.call("ipodDevices.isOnline", { deviceId }).catch(() => false)
+			]);
+
+			// Build the assignment tree: groups with nested playlists.
+			const assignedIds = device.playlistIds || [];
+			const assignedGroups = device.groupIds || [];
+			const tree = [];
+			for (const g of allGroups) {
+				tree.push({
+					id: g.id,
+					name: g.name,
+					type: "group",
+					assigned: assignedGroups.includes(g.id),
+					playlists: allPlaylists
+						.filter((p) => p.groupId === g.id)
+						.map((p) => ({
+							id: p.id,
+							name: p.name,
+							aliasOf: p.aliasOf || null,
+							trackCount: (p.trackIds || []).length,
+							assigned: assignedIds.includes(p.id),
+							viaGroup: assignedGroups.includes(g.id),
+							effective: assignedIds.includes(p.id) || assignedGroups.includes(g.id)
+						}))
+				});
+			}
+			const ungrouped = allPlaylists.filter((p) => !p.groupId);
+			if (ungrouped.length > 0) {
+				tree.push({
+					id: null,
+					name: "Ungrouped",
+					type: "ungrouped",
+					assigned: false,
+					playlists: ungrouped.map((p) => ({
+						id: p.id,
+						name: p.name,
+						aliasOf: p.aliasOf || null,
+						trackCount: (p.trackIds || []).length,
+						assigned: assignedIds.includes(p.id),
+						viaGroup: false,
+						effective: assignedIds.includes(p.id)
+					}))
+				});
+			}
+
+			// Read identity LIVE from the device (not from the DB record, which may
+			// be stale after a wipe or a crashed sync).
+			let liveIdentity = null;
+			if (device.lastKnownMountPath) {
+				try {
+					const discovered = await ctx.call("ipodEngine.discover");
+					const found = discovered.find((d) => d.mountPath === device.lastKnownMountPath);
+					liveIdentity = found?.identity || null;
+				} catch {}
+			}
+
+			// Build the on-device snapshot from the live identity.
+			const onDevice = liveIdentity?.snapshot || null;
+
+			// If the DB has no assignments but the identity snapshot has playlists,
+			// derive effective assignments from the snapshot so the UI shows what's
+			// on the device pre-selected. This handles wipe/re-mount scenarios.
+			let effectiveAssignedIds = [...assignedIds];
+			if (effectiveAssignedIds.length === 0 && onDevice && onDevice.playlists) {
+				for (const snapPl of onDevice.playlists) {
+					// Match snapshot playlist IDs to our playlist records.
+					if (allPlaylists.find((p) => p.id === snapPl.id) && !effectiveAssignedIds.includes(snapPl.id)) {
+						effectiveAssignedIds.push(snapPl.id);
+					}
+				}
+			}
+
+			// Rebuild the tree with effective assignments.
+			const effectiveAssignedGroups = [];
+			for (const g of allGroups) {
+				const members = allPlaylists.filter((p) => p.groupId === g.id);
+				const allAssigned = members.every((p) => effectiveAssignedIds.includes(p.id));
+				if (allAssigned && members.length > 0) effectiveAssignedGroups.push(g.id);
+			}
+			// Rebuild tree with effective assignments.
+			const effectiveTree = [];
+			for (const g of allGroups) {
+				effectiveTree.push({
+					id: g.id,
+					name: g.name,
+					type: "group",
+					assigned: effectiveAssignedGroups.includes(g.id),
+					playlists: allPlaylists
+						.filter((p) => p.groupId === g.id)
+						.map((p) => ({
+							id: p.id,
+							name: p.name,
+							aliasOf: p.aliasOf || null,
+							trackCount: (p.trackIds || []).length,
+							assigned: effectiveAssignedIds.includes(p.id),
+							viaGroup: effectiveAssignedGroups.includes(g.id),
+							effective: effectiveAssignedIds.includes(p.id) || effectiveAssignedGroups.includes(g.id)
+						}))
+				});
+			}
+			const effUngrouped = allPlaylists.filter((p) => !p.groupId);
+			if (effUngrouped.length > 0) {
+				effectiveTree.push({
+					id: null,
+					name: "Ungrouped",
+					type: "ungrouped",
+					assigned: false,
+					playlists: effUngrouped.map((p) => ({
+						id: p.id,
+						name: p.name,
+						aliasOf: p.aliasOf || null,
+						trackCount: (p.trackIds || []).length,
+						assigned: effectiveAssignedIds.includes(p.id),
+						viaGroup: false,
+						effective: effectiveAssignedIds.includes(p.id)
+					}))
+				});
+			}
+
+			// Compute the diff server-side.
+			const { computeDiff } = require("../lib/diff");
+			const diff = computeDiff(onDevice, resolved);
+
+			return {
+				device: {
+					id: device.id,
+					name: device.name,
+					online,
+					totalBytes: device.totalBytes || 0,
+					freeBytes: device.freeBytes || 0,
+					lastSyncAt: device.lastSyncAt || null,
+					lastKnownMountPath: device.lastKnownMountPath || null
+				},
+				assignments: {
+					tree: effectiveTree.length > 0 ? effectiveTree : tree,
+					assignedPlaylistIds: effectiveAssignedIds,
+					assignedGroupIds: effectiveAssignedGroups
+				},
+				onDevice,
+				diff,
+				resolve: {
+					trackCount: (resolved.tracks || []).length,
+					playlistCount: (resolved.playlists || []).length
+				}
+			};
 		}
 	}
 };

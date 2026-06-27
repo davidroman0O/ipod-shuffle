@@ -83,6 +83,7 @@
 				toast.success(`Sync complete`, {
 					description: `${status.result?.manifest.length ?? 0} tracks written`
 				});
+				onAssignmentChanged?.();
 			} else if (status.status === 'failed') {
 				stopPolling();
 				toast.error('Sync failed', { description: status.error ?? 'Unknown error' });
@@ -141,7 +142,7 @@
 			<Button variant="outline" size="sm" onclick={preview} disabled={loading}>
 				{loading ? 'Previewing…' : 'Preview'}
 			</Button>
-			<Button size="sm" onclick={startSync} disabled={!device.playlistIds.length}>
+			<Button size="sm" onclick={startSync} disabled={!device.playlistIds.length && !(device.groupIds && device.groupIds.length)}>
 				<Play class="size-4" /> Sync now
 			</Button>
 		</div>
