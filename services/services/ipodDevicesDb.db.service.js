@@ -34,7 +34,8 @@ module.exports = {
 			freeBytes: { type: "number", optional: true },
 			lastSeenAt: { type: "string", optional: true },
 			lastSyncAt: { type: "string", optional: true },
-			manifest: { type: "array", items: "object", default: [] }
+			manifest: { type: "array", items: "object", default: [] },
+			groupIds: { type: "array", items: "string", default: [] }
 		}
 	},
 
@@ -102,6 +103,25 @@ module.exports = {
 			}
 		},
 
+		/** Toggle a GROUP assignment on a device (group-level sync). */
+		toggleGroupAssignment: {
+			params: {
+				deviceId: { type: "string", required: true },
+				groupId: { type: "string", required: true }
+			},
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				const device = await this.findEntity(ctx, { query: { _id: ctx.params.deviceId } });
+				if (!device) throw new MoleculerError("Device not found.", 404);
+				const groupIds = device.groupIds || [];
+				const has = groupIds.includes(ctx.params.groupId);
+				const next = has
+					? groupIds.filter(id => id !== ctx.params.groupId)
+					: [...groupIds, ctx.params.groupId];
+				return this.updateEntity(ctx, { id: ctx.params.deviceId, groupIds: next });
+			}
+		},
+
 		/** Reorder the playlist sync order for a device (full ordered id list). */
 		setPlaylistOrder: {
 			params: {
@@ -138,15 +158,15 @@ module.exports = {
 	methods: {
 		async upsertDiscovered(ctx, discovered) {
 			const now = this.now();
-			const existing = await this.findExisting(ctx, discovered);
-			// Stable, slash-free id: prefer the volume UUID; otherwise derive a short
-			// hash from the mount path so it is safe to put in a URL path segment.
-			const stableId = discovered.volumeUuid || stableIdFromMount(discovered.mountPath);
+			// Stable id priority: on-device identity > volume UUID > mount-path hash.
+			const identityId = discovered.identity?.id;
+			const stableId = identityId || discovered.volumeUuid || stableIdFromMount(discovered.mountPath);
+			const existing = await this.findExisting(ctx, discovered, stableId);
 			if (!existing) {
 				return {
 					device: await this.createEntity(ctx, {
 						id: stableId,
-						name: discovered.name,
+						name: discovered.identity?.name || discovered.name,
 						playlistIds: [],
 						preferredMountPath: discovered.mountPath,
 						lastKnownMountPath: discovered.mountPath,
@@ -162,7 +182,7 @@ module.exports = {
 			return {
 				device: await this.updateEntity(ctx, {
 					id: existing.id,
-					name: discovered.name,
+					name: discovered.identity?.name || discovered.name,
 					preferredMountPath: discovered.mountPath,
 					lastKnownMountPath: discovered.mountPath,
 					volumeUuid: discovered.volumeUuid || existing.volumeUuid,
@@ -175,8 +195,12 @@ module.exports = {
 			};
 		},
 
-		/** Match an existing device by UUID, preferred, or last-known mount path. */
-		async findExisting(ctx, discovered) {
+		/** Match by identity id (strongest), UUID, preferred, or last-known mount path. */
+		async findExisting(ctx, discovered, stableId) {
+			if (stableId) {
+				const byId = await this.findEntity(ctx, { query: { _id: stableId } });
+				if (byId) return byId;
+			}
 			if (discovered.volumeUuid) {
 				const byUuid = await this.findEntity(ctx, {
 					query: { volumeUuid: discovered.volumeUuid }

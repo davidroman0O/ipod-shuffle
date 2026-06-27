@@ -18,4 +18,35 @@ type Device struct {
 	MediaType  string `json:"mediaType,omitempty"`
 	TotalBytes int64  `json:"totalBytes"`
 	FreeBytes  int64  `json:"freeBytes"`
+	// Identity is read from the device's iPod_Control/.ipod-shuffle-identity.json
+	// file. When present, its ID is authoritative (survives remounts).
+	Identity *DeviceIdentity `json:"identity,omitempty"`
+}
+
+// DeviceIdentity mirrors identity.File but is API-facing.
+type DeviceIdentity struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Snapshot *DeviceSnapshot `json:"snapshot,omitempty"`
+}
+
+// DeviceSnapshot is the last-sync state as seen from the engine.
+type DeviceSnapshot struct {
+	SyncedAt    string                   `json:"syncedAt,omitempty"`
+	TotalTracks int                      `json:"totalTracks,omitempty"`
+	Playlists   []DeviceSnapshotPlaylist `json:"playlists,omitempty"`
+}
+
+type DeviceSnapshotPlaylist struct {
+	ID     string                 `json:"id"`
+	Name   string                 `json:"name"`
+	Tracks []DeviceSnapshotTrack  `json:"tracks"`
+}
+
+type DeviceSnapshotTrack struct {
+	ID         string `json:"id"`
+	FileName   string `json:"fileName"`
+	SourcePath string `json:"sourcePath"`
+	DevicePath string `json:"devicePath"`
+	SizeBytes  int64  `json:"sizeBytes"`
 }

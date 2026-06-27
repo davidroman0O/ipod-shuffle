@@ -43,7 +43,8 @@ module.exports = {
 					upserted.push({
 						...result.device,
 						totalBytes: live?.totalBytes ?? result.device.totalBytes,
-						freeBytes: live?.freeBytes ?? result.device.freeBytes
+						freeBytes: live?.freeBytes ?? result.device.freeBytes,
+						identity: live?.identity ?? result.device.identity
 					});
 					if (result.created) created++;
 				}
@@ -168,6 +169,29 @@ module.exports = {
 				});
 				await ctx.emit("ipod.devices.removed", { deviceId: ctx.params.deviceId });
 				return removed;
+			}
+		},
+
+		/** Name a device: writes identity to the device + updates the DB name. */
+		name: {
+			params: {
+				deviceId: { type: "string", required: true },
+				name: { type: "string", required: true }
+			},
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				const device = await ctx.call("ipodDevicesDb.get", { id: ctx.params.deviceId });
+				if (!device) throw new MoleculerError("Device not found.", 404);
+				if (!device.lastKnownMountPath) throw new MoleculerError("Device is not mounted.", 409);
+				await ctx.call("ipodEngine.setIdentity", {
+					mountPath: device.lastKnownMountPath,
+					name: ctx.params.name,
+					id: ctx.params.deviceId
+				});
+				return ctx.call("ipodDevicesDb.update", {
+					id: ctx.params.deviceId,
+					name: ctx.params.name
+				});
 			}
 		}
 	}

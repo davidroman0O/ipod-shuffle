@@ -114,13 +114,13 @@
 {:else}
 	<div class="flex flex-wrap gap-4">
 		{#each devices as device (device.id)}
-			<button class="text-left" onclick={() => openDetail(device)}>
-				<DeviceCard
-					{device}
-					online={online[device.id] ?? false}
-					onRemove={() => handleRemoveDevice(device)}
-				/>
-			</button>
+			<DeviceCard
+				{device}
+				online={online[device.id] ?? false}
+				onManage={() => openDetail(device)}
+				onRemove={() => handleRemoveDevice(device)}
+				onRenamed={load}
+			/>
 		{/each}
 	</div>
 {/if}

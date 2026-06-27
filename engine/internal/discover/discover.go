@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/davidroman0O/ipod-shuffle/engine/internal/identity"
 )
 
 // iPodControlDir is the marker directory whose presence identifies a volume as
@@ -67,6 +69,42 @@ func InspectMount(ctx context.Context, mountPath string, runner Runner) (Device,
 	if err == nil {
 		dev.TotalBytes = stats.TotalBytes
 		dev.FreeBytes = stats.FreeBytes
+	}
+	// Identity from the device's on-disk file — when present, its id+name are
+	// authoritative (survives remounts, mount-path shifts, cross-machine moves).
+	if ident, _ := ReadIdentityFromMount(abs); ident != nil {
+		dev.Identity = ident
+		dev.ID = ident.ID
+		dev.Name = ident.Name
+	}
+	return dev, nil
+}
+
+// ReadIdentityFromMount reads the identity file from a mounted device and
+// returns the API-facing shape, or nil when absent.
+func ReadIdentityFromMount(mountPath string) (*DeviceIdentity, error) {
+	f, err := identity.Read(mountPath)
+	if err != nil || f == nil {
+		return nil, err
+	}
+	dev := &DeviceIdentity{ID: f.ID, Name: f.Name}
+	if f.Snapshot != nil {
+		snap := &DeviceSnapshot{
+			SyncedAt:    f.Snapshot.SyncedAt,
+			TotalTracks: f.Snapshot.TotalTracks,
+			Playlists:   make([]DeviceSnapshotPlaylist, len(f.Snapshot.Playlists)),
+		}
+		for i, p := range f.Snapshot.Playlists {
+			tracks := make([]DeviceSnapshotTrack, len(p.Tracks))
+			for j, t := range p.Tracks {
+				tracks[j] = DeviceSnapshotTrack{
+					ID: t.ID, FileName: t.FileName, SourcePath: t.SourcePath,
+					DevicePath: t.DevicePath, SizeBytes: t.SizeBytes,
+				}
+			}
+			snap.Playlists[i] = DeviceSnapshotPlaylist{ID: p.ID, Name: p.Name, Tracks: tracks}
+		}
+		dev.Snapshot = snap
 	}
 	return dev, nil
 }

@@ -59,6 +59,11 @@ class EngineClient {
 		return this.#postJson("/v1/sync", body);
 	}
 
+	/** POST /v1/devices/identity — write the on-device identity file. */
+	async setIdentity(mountPath, name, id) {
+		return this.#postJson("/v1/devices/identity", { mountPath, name, id });
+	}
+
 	async #getJson(path) {
 		const res = await this.#do(path, "GET");
 		return this.#parse(res);

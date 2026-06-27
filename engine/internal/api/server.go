@@ -64,6 +64,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /v1/health", s.handleHealth)
 	mux.HandleFunc("GET /v1/discover", s.handleDiscover)
 	mux.HandleFunc("GET /v1/devices/inspect", s.handleInspect)
+	mux.HandleFunc("POST /v1/devices/identity", s.handleSetIdentity)
 	mux.HandleFunc("POST /v1/sync/plan", s.handleSyncPlan)
 	mux.HandleFunc("POST /v1/sync", s.handleSync)
 	return mux

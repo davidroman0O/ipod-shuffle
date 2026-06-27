@@ -27,6 +27,8 @@ module.exports = {
 			name: { type: "string", required: true },
 			trackIds: { type: "array", items: "string", default: [] },
 			position: { type: "number", default: 0 },
+			groupId: { type: "string", optional: true },
+			aliasOf: { type: "string", optional: true },
 			createdAt: "string",
 			updatedAt: "string"
 		}
@@ -139,6 +141,82 @@ module.exports = {
 		},
 
 		/**
+		 * Clone a playlist: creates an independent copy with the same trackIds.
+		 * The clone can be freely edited afterwards; changes to the source don't
+		 * affect it.
+		 */
+		clone: {
+			params: {
+				id: { type: "string", required: true },
+				name: { type: "string", optional: true },
+				groupId: { type: "string", optional: true }
+			},
+			async handler(ctx) {
+				return this.clonePlaylist(ctx, ctx.params.id, ctx.params.name, ctx.params.groupId);
+			}
+		},
+
+		/**
+		 * Create an alias: a lightweight reference that mirrors the source's
+		 * tracks in real-time. Has no own trackIds; can be placed in a different
+		 * group. At sync time, aliases resolve to their source.
+		 */
+		alias: {
+			params: {
+				sourceId: { type: "string", required: true },
+				groupId: { type: "string", optional: true },
+				name: { type: "string", optional: true }
+			},
+			async handler(ctx) {
+				return this.createAlias(ctx, ctx.params.sourceId, ctx.params.groupId, ctx.params.name);
+			}
+		},
+
+		/** Move a playlist to a group (or ungrouped if groupId is null). */
+		moveToGroup: {
+			params: {
+				id: { type: "string", required: true },
+				groupId: { type: "string", optional: true }
+			},
+			async handler(ctx) {
+				return this.updateEntity(ctx, {
+					id: ctx.params.id,
+					groupId: ctx.params.groupId ?? null,
+					updatedAt: this.now()
+				});
+			}
+		},
+
+		/** Clear a group from all member playlists (called on group deletion). */
+		clearGroup: {
+			params: { groupId: { type: "string", required: true } },
+			async handler(ctx) {
+				const docs = await this.findEntities(ctx, { query: { groupId: ctx.params.groupId } });
+				const now = this.now();
+				for (const doc of docs) {
+					await this.updateEntity(ctx, { id: doc.id, groupId: null, updatedAt: now });
+				}
+				return { cleared: docs.length };
+			}
+		},
+
+		/** Resolve an alias to its source playlist (returns the playlist itself if not an alias). */
+		resolveSource: {
+			params: { id: { type: "string", required: true } },
+			async handler(ctx) {
+				return this.resolveSourcePlaylist(ctx, ctx.params.id);
+			}
+		},
+
+		/** Return all playlists belonging to a specific group. */
+		listByGroup: {
+			params: { groupId: { type: "string", required: true } },
+			async handler(ctx) {
+				return this.findEntities(ctx, { query: { groupId: ctx.params.groupId } });
+			}
+		},
+
+		/**
 		 * Return all playlists ordered by their list `position` (stable for the UI
 		 * and for device sync ordering).
 		 */
@@ -210,7 +288,52 @@ module.exports = {
 	},
 
 	methods: {
+		/** Clone: deep-copy trackIds into a new independent playlist. */
+		async clonePlaylist(ctx, sourceId, name, groupId) {
+			const source = await this.resolveSourcePlaylist(ctx, sourceId);
+			const position = await this.nextPosition(ctx);
+			const now = this.now();
+			return this.createEntity(ctx, {
+				name: name || `${source.name} (copy)`,
+				trackIds: [...(source.trackIds || [])],
+				position,
+				groupId: groupId ?? null,
+				aliasOf: null,
+				createdAt: now,
+				updatedAt: now
+			});
+		},
+
+		/** Alias: a lightweight reference mirroring the source. No own trackIds. */
+		async createAlias(ctx, sourceId, groupId, name) {
+			const source = await this.resolveSourcePlaylist(ctx, sourceId);
+			const position = await this.nextPosition(ctx);
+			const now = this.now();
+			return this.createEntity(ctx, {
+				name: name || `${source.name} (alias)`,
+				trackIds: [],
+				position,
+				groupId: groupId ?? null,
+				aliasOf: source.id,
+				createdAt: now,
+				updatedAt: now
+			});
+		},
+
+		/** Resolve an alias chain to its ultimate source playlist. */
+		async resolveSourcePlaylist(ctx, playlistId) {
+			const playlist = await this.findEntity(ctx, { query: { _id: playlistId } });
+			if (!playlist) throw new MoleculerError("Playlist not found.", 404);
+			if (playlist.aliasOf) {
+				return this.resolveSourcePlaylist(ctx, playlist.aliasOf);
+			}
+			return playlist;
+		},
+
 		async addTrackToPlaylist(ctx, playlistId, trackId) {
+			// Aliases don't own tracks — resolve to source.
+			const source = await this.resolveSourcePlaylist(ctx, playlistId);
+			playlistId = source.id;
 			const playlist = await this.findEntity(ctx, { query: { _id: playlistId } });
 			if (!playlist) throw new MoleculerError("Playlist not found.", 404);
 			if (playlist.trackIds.includes(trackId)) return playlist;
@@ -258,6 +381,9 @@ module.exports = {
 		},
 
 		async removeTrackFromPlaylist(ctx, playlistId, trackId) {
+			// Aliases don't own tracks — resolve to source.
+			const source = await this.resolveSourcePlaylist(ctx, playlistId);
+			playlistId = source.id;
 			const playlist = await this.findEntity(ctx, { query: { _id: playlistId } });
 			if (!playlist) throw new MoleculerError("Playlist not found.", 404);
 			return this.updateEntity(ctx, {

@@ -5,6 +5,7 @@
 	import { type Device, type Playlist, type SyncPlan, type SyncJobStatus, syncApi } from '$lib/api';
 	import PlaylistAssignmentList from './playlist-assignment-list.svelte';
 	import SyncPlanSummary from './sync-plan-summary.svelte';
+	import DeviceSnapshot from './device-snapshot.svelte';
 	import Play from '@lucide/svelte/icons/play';
 	import X from '@lucide/svelte/icons/x';
 
@@ -131,5 +132,9 @@
 
 	{#if plan}
 		<SyncPlanSummary {plan} />
+	{/if}
+
+	{#if !isRunning}
+		<DeviceSnapshot identity={device.identity} />
 	{/if}
 </div>

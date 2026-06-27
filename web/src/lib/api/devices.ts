@@ -14,6 +14,8 @@ export const devicesApi = {
 	isOnline: (deviceId: string) => apiFetch<boolean>(`/devices/${deviceId}/online`),
 	/** Forget a device record. */
 	remove: (deviceId: string) => apiFetch<string | null>(`/devices/${deviceId}`, { method: 'DELETE' }),
+	/** Name a device (writes identity to the device + updates DB). */
+	name: (deviceId: string, name: string) => apiPost<Device>(`/devices/${deviceId}/name`, { name }),
 	/** Set the ordered list of playlists assigned to a device (= sync order). */
 	setPlaylistOrder: (deviceId: string, playlistIds: string[]) =>
 		apiPost<Device>(`/devices/${deviceId}/order`, { playlistIds })

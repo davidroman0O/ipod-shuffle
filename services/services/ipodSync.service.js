@@ -229,15 +229,35 @@ module.exports = {
 			const device = await ctx.call("ipodDevicesDb.get", { id: deviceId });
 			if (!device) throw new MoleculerError(`Unknown device "${deviceId}".`, 404);
 
-			const playlistIds = device.playlistIds || [];
-			const playlists = playlistIds.length
-				? await ctx.call("ipodPlaylists.resolveByIds", { ids: playlistIds })
-				: [];
+			// Gather all assigned playlist ids: individual picks + group expansions.
+			const individualIds = device.playlistIds || [];
+			const groupIds = device.groupIds || [];
+			let allPlaylistIds = [...individualIds];
 
+			// Expand groups into their member playlists.
+			for (const groupId of groupIds) {
+				const groupPlaylists = await ctx.call("ipodPlaylistsDb.listByGroup", { groupId });
+				for (const gp of groupPlaylists) {
+					if (!allPlaylistIds.includes(gp.id)) allPlaylistIds.push(gp.id);
+				}
+			}
+
+			// Resolve aliases: each playlist may be an alias — resolve to source.
+			const resolvedPlaylists = [];
+			const seenIds = new Set();
+			for (const pid of allPlaylistIds) {
+				const source = await ctx.call("ipodPlaylistsDb.resolveSource", { id: pid });
+				if (!seenIds.has(source.id)) {
+					seenIds.add(source.id);
+					resolvedPlaylists.push({ id: source.id, name: source.name, trackIds: source.trackIds || [] });
+				}
+			}
+
+			// Build the deduped track union.
 			const seen = new Set();
 			const trackIds = [];
-			for (const playlist of playlists) {
-				for (const trackId of playlist.trackIds || []) {
+			for (const playlist of resolvedPlaylists) {
+				for (const trackId of playlist.trackIds) {
 					if (!seen.has(trackId)) {
 						seen.add(trackId);
 						trackIds.push(trackId);
@@ -259,10 +279,10 @@ module.exports = {
 					sizeBytes: t.sizeBytes
 				}));
 
-			const enginePlaylists = playlists.map(playlist => ({
+			const enginePlaylists = resolvedPlaylists.map(playlist => ({
 				playlistId: playlist.id,
 				name: playlist.name,
-				trackIds: (playlist.trackIds || []).filter(id => trackExists.has(id))
+				trackIds: playlist.trackIds.filter(id => trackExists.has(id))
 			}));
 
 			return { device, tracks: engineTracks, playlists: enginePlaylists };

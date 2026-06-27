@@ -59,6 +59,17 @@ describe("Test 'ipodDevicesDb' data-owner service", () => {
 		expect(updated.playlistIds).toEqual([]);
 	});
 
+	it("should toggle group assignments", async () => {
+		const { device } = await broker.call("ipodDevicesDb.upsertFromDiscovery", { discovered });
+		await broker.call("ipodDevicesDb.toggleGroupAssignment", { deviceId: device.id, groupId: "g1" });
+		let updated = await broker.call("ipodDevicesDb.get", { id: device.id });
+		expect(updated.groupIds).toEqual(["g1"]);
+
+		await broker.call("ipodDevicesDb.toggleGroupAssignment", { deviceId: device.id, groupId: "g1" });
+		updated = await broker.call("ipodDevicesDb.get", { id: device.id });
+		expect(updated.groupIds).toEqual([]);
+	});
+
 	it("should record a sync manifest", async () => {
 		const { device } = await broker.call("ipodDevicesDb.upsertFromDiscovery", { discovered });
 		await broker.call("ipodDevicesDb.recordSync", {

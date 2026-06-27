@@ -47,11 +47,40 @@ export interface Device {
 	lastSeenAt?: string;
 	lastSyncAt?: string;
 	manifest?: ManifestEntry[];
+	/** On-device identity (from iPod_Control/.ipod-shuffle-identity.json). */
+	identity?: DeviceIdentity;
 }
 
 export interface ManifestEntry {
 	trackId: string;
 	relativePath: string;
+	sizeBytes: number;
+}
+
+/** On-device identity with the last-sync snapshot. */
+export interface DeviceIdentity {
+	id: string;
+	name: string;
+	snapshot?: DeviceSnapshot;
+}
+
+export interface DeviceSnapshot {
+	syncedAt: string;
+	totalTracks: number;
+	playlists: DeviceSnapshotPlaylist[];
+}
+
+export interface DeviceSnapshotPlaylist {
+	id: string;
+	name: string;
+	tracks: DeviceSnapshotTrack[];
+}
+
+export interface DeviceSnapshotTrack {
+	id: string;
+	fileName: string;
+	sourcePath: string;
+	devicePath: string;
 	sizeBytes: number;
 }
 

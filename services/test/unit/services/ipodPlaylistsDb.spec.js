@@ -11,6 +11,7 @@ describe("Test 'ipodPlaylistsDb' data-owner service", () => {
 	beforeEach(async () => {
 		broker = new ServiceBroker({ logger: false });
 		broker.createService(PlaylistsDbService);
+		broker.createService(require("../../../services/ipodPlaylistGroupsDb.db.service"));
 		await broker.start();
 	});
 	afterEach(() => broker.stop());
@@ -155,5 +156,65 @@ describe("Test 'ipodPlaylistsDb' data-owner service", () => {
 		await expect(
 			broker.call("ipodPlaylistsDb.rename", { id: b.id, name: "a" })
 		).rejects.toBeInstanceOf(MoleculerError);
+	});
+
+	it("clone should deep-copy trackIds into an independent playlist", async () => {
+		const pl = await broker.call("ipodPlaylistsDb.createNamed", { name: "Source" });
+		await broker.call("ipodPlaylistsDb.addTrack", { id: pl.id, trackId: "t1" });
+		await broker.call("ipodPlaylistsDb.addTrack", { id: pl.id, trackId: "t2" });
+
+		const clone = await broker.call("ipodPlaylistsDb.clone", { id: pl.id });
+		expect(clone.name).toBe("Source (copy)");
+		expect(clone.trackIds).toEqual(["t1", "t2"]);
+		expect(clone.aliasOf).toBeNull();
+
+		// Editing the clone doesn't affect the source.
+		await broker.call("ipodPlaylistsDb.addTrack", { id: clone.id, trackId: "t3" });
+		const source = await broker.call("ipodPlaylistsDb.get", { id: pl.id });
+		expect(source.trackIds).toEqual(["t1", "t2"]);
+	});
+
+	it("alias should mirror the source with no own trackIds", async () => {
+		const pl = await broker.call("ipodPlaylistsDb.createNamed", { name: "Original" });
+		await broker.call("ipodPlaylistsDb.addTrack", { id: pl.id, trackId: "t1" });
+
+		const alias = await broker.call("ipodPlaylistsDb.alias", { sourceId: pl.id });
+		expect(alias.name).toBe("Original (alias)");
+		expect(alias.aliasOf).toBe(pl.id);
+		expect(alias.trackIds).toEqual([]);
+
+		// resolveSource follows the alias chain.
+		const source = await broker.call("ipodPlaylistsDb.resolveSource", { id: alias.id });
+		expect(source.id).toBe(pl.id);
+		expect(source.trackIds).toEqual(["t1"]);
+	});
+
+	it("addTrack on an alias should modify the source, not the alias", async () => {
+		const pl = await broker.call("ipodPlaylistsDb.createNamed", { name: "Src" });
+		await broker.call("ipodPlaylistsDb.addTrack", { id: pl.id, trackId: "t1" });
+
+		const alias = await broker.call("ipodPlaylistsDb.alias", { sourceId: pl.id });
+		await broker.call("ipodPlaylistsDb.addTrack", { id: alias.id, trackId: "t2" });
+
+		// The source got the new track.
+		const source = await broker.call("ipodPlaylistsDb.get", { id: pl.id });
+		expect(source.trackIds).toEqual(["t1", "t2"]);
+
+		// The alias still has no own trackIds.
+		const storedAlias = await broker.call("ipodPlaylistsDb.get", { id: alias.id });
+		expect(storedAlias.trackIds).toEqual([]);
+	});
+
+	it("moveToGroup should set and clear group membership", async () => {
+		const g = await broker.call("ipodPlaylistGroupsDb.createNamed", { name: "Group" });
+		const pl = await broker.call("ipodPlaylistsDb.createNamed", { name: "PL" });
+
+		await broker.call("ipodPlaylistsDb.moveToGroup", { id: pl.id, groupId: g.id });
+		let stored = await broker.call("ipodPlaylistsDb.get", { id: pl.id });
+		expect(stored.groupId).toBe(g.id);
+
+		await broker.call("ipodPlaylistsDb.moveToGroup", { id: pl.id, groupId: null });
+		stored = await broker.call("ipodPlaylistsDb.get", { id: pl.id });
+		expect(stored.groupId).toBeNull();
 	});
 });

@@ -35,7 +35,9 @@ module.exports = {
 					"GET /devices": "ipodDevices.refresh",
 					"POST /devices/register": "ipodDevices.register",
 					"POST /devices/:deviceId/playlists/:playlistId": "ipodDevices.assignPlaylist",
-					"POST /devices/:deviceId/order": "ipodDevices.setPlaylistOrder",
+					"POST /devices/:deviceId/groups/:groupId": "ipodDevicesDb.toggleGroupAssignment",
+					"POST /devices/:deviceId/order": "ipodDevicesDb.setPlaylistOrder",
+					"POST /devices/:deviceId/name": "ipodDevices.name",
 					"GET /devices/:deviceId/online": "ipodDevices.isOnline",
 					"DELETE /devices/:deviceId": "ipodDevices.remove",
 
@@ -65,6 +67,16 @@ module.exports = {
 					"POST /playlists/:id/insert": "ipodPlaylists.insertTracks",
 					"POST /playlists/:id/tracks/:trackId": "ipodPlaylists.addTrack",
 					"DELETE /playlists/:id/tracks/:trackId": "ipodPlaylists.removeTrack",
+					"POST /playlists/:id/clone": "ipodPlaylistsDb.clone",
+					"POST /playlists/:id/alias": "ipodPlaylistsDb.alias",
+					"PATCH /playlists/:id/group": "ipodPlaylistsDb.moveToGroup",
+
+					// Playlist groups.
+					"GET /groups": "ipodPlaylistGroupsDb.listOrdered",
+					"POST /groups": "ipodPlaylistGroupsDb.createNamed",
+					"PATCH /groups/:id": "ipodPlaylistGroupsDb.rename",
+					"DELETE /groups/:id": "ipodPlaylistGroupsDb.removeGroup",
+					"POST /groups/order": "ipodPlaylistGroupsDb.setOrder",
 
 					// Sync.
 					"GET /sync/:deviceId/resolve": "ipodSync.resolve",

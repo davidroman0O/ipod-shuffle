@@ -65,6 +65,19 @@ module.exports = {
 			}
 		},
 
+		/** Write/update the on-device identity file. */
+		setIdentity: {
+			params: {
+				mountPath: { type: "string", required: true },
+				name: { type: "string", required: true },
+				id: { type: "string", required: true }
+			},
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				return this.engine.setIdentity(ctx.params.mountPath, ctx.params.name, ctx.params.id);
+			}
+		},
+
 		/** Execute a sync against a device (writes iTunesSD/iTunesStats). */
 		sync: {
 			params: {
