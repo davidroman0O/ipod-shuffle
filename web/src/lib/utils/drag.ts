@@ -9,6 +9,7 @@ export type DragPayload =
 	| { kind: 'files'; paths: string[] }
 	| { kind: 'folder'; absolutePath: string; name: string }
 	| { kind: 'track'; trackId: string }
+	| { kind: 'tracks'; trackIds: string[] }
 	| { kind: 'playlist'; playlistId: string };
 
 export function isFilesPayload(

@@ -50,6 +50,7 @@ export interface Device {
 	id: string;
 	name: string;
 	playlistIds: string[];
+	groupIds: string[];
 	preferredMountPath?: string;
 	lastKnownMountPath?: string;
 	volumeUuid?: string;

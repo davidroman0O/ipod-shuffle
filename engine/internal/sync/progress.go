@@ -157,7 +157,7 @@ func removeFilesWithProgress(mountPath string, relPaths []string, fsys FS, progr
 	for i, rel := range relPaths {
 		full := filepath.Join(mountPath, filepath.FromSlash(rel))
 		if progress != nil {
-			progress(ProgressEvent{Phase: "delete", Current: i + 1, Total: len(relPaths), Path: rel})
+			progress(ProgressEvent{Type: "progress", Phase: "delete", Current: i + 1, Total: len(relPaths), Path: rel})
 		}
 		if err := fsys.Remove(full); err != nil && !isNotExist(err) {
 			return err
@@ -172,7 +172,7 @@ func copyFilesWithProgress(ops []CopyOp, fsys FS, progress Progress) error {
 			return err
 		}
 		if progress != nil {
-			progress(ProgressEvent{Phase: "copy", Current: i + 1, Total: len(ops), Path: op.RelativePath})
+			progress(ProgressEvent{Type: "progress", Phase: "copy", Current: i + 1, Total: len(ops), Path: op.RelativePath})
 		}
 		if err := fsys.Copy(op.Source, op.Destination); err != nil {
 			return err

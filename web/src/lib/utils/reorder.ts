@@ -17,6 +17,24 @@ export function reorder<T>(list: T[], from: number, to: number): T[] {
 }
 
 /**
+ * Move multiple items within a list from their current positions to a target
+ * insertion point. Used for multi-select drag-and-drop reordering.
+ * Preserves the relative order of the moved items.
+ */
+export function reorderMany<T>(list: T[], indices: number[], insertAt: number): T[] {
+	if (indices.length === 0) return list;
+	const movingSet = new Set(indices);
+	const remaining = list.filter((_, i) => !movingSet.has(i));
+	const moved = indices.map((i) => list[i]).filter(Boolean);
+	// Adjust insertion point: subtract the count of removed items above it.
+	const removedAbove = indices.filter((i) => i < insertAt).length;
+	const adjusted = Math.max(0, insertAt - removedAbove);
+	const result = [...remaining];
+	result.splice(adjusted, 0, ...moved);
+	return result;
+}
+
+/**
  * Compute the destination index for a drop given the source index and the
  * before/after position reported by sveltednd.
  */

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { devicesApi, playlistsApi, type Device, type Playlist, type Track } from '$lib/api';
+	import { devicesApi, playlistsApi, groupsApi, type Device, type Playlist, type PlaylistGroup, type Track } from '$lib/api';
 	import DeviceCard from '$lib/components/devices/device-card.svelte';
 	import RegisterMountDialog from '$lib/components/devices/register-mount-dialog.svelte';
 	import DeviceSyncPanel from '$lib/components/devices/device-sync-panel.svelte';
@@ -13,6 +13,7 @@
 
 	let devices = $state<Device[]>([]);
 	let playlists = $state<Playlist[]>([]);
+	let groups = $state<PlaylistGroup[]>([]);
 	let online = $state<Record<string, boolean>>({});
 	let loading = $state(true);
 	let refreshing = $state(false);
@@ -29,8 +30,9 @@
 	async function load() {
 		loading = true;
 		try {
-			const [pl, devs] = await Promise.all([playlistsApi.list(), fetchDevices()]);
+			const [pl, grps, devs] = await Promise.all([playlistsApi.list(), groupsApi.list(), fetchDevices()]);
 			playlists = pl;
+			groups = grps;
 			devices = devs;
 			await refreshOnline();
 		} catch (e) {
@@ -158,6 +160,7 @@
 			<DeviceSyncPanel
 				device={selected}
 				{playlists}
+				{groups}
 				onAssignmentChanged={onAssignmentChanged}
 			/>
 			{#if selected.identity?.snapshot}

@@ -2,7 +2,7 @@
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import { toast } from 'svelte-sonner';
-	import { type Device, type Playlist, type SyncPlan, type SyncJobStatus, syncApi, devicesApi } from '$lib/api';
+	import { type Device, type Playlist, type PlaylistGroup, type SyncPlan, type SyncJobStatus, syncApi, devicesApi } from '$lib/api';
 	import PlaylistAssignmentList from './playlist-assignment-list.svelte';
 	import SyncPlanSummary from './sync-plan-summary.svelte';
 	import DeviceSnapshot from './device-snapshot.svelte';
@@ -12,10 +12,12 @@
 	let {
 		device,
 		playlists,
+		groups,
 		onAssignmentChanged
 	}: {
 		device: Device;
 		playlists: Playlist[];
+		groups?: PlaylistGroup[];
 		onAssignmentChanged?: () => void;
 	} = $props();
 
@@ -114,7 +116,7 @@
 </script>
 
 <div class="space-y-4">
-	<PlaylistAssignmentList {device} {playlists} onChanged={handleChanged} />
+	<PlaylistAssignmentList {device} {playlists} groups={groups ?? []} onChanged={handleChanged} />
 
 	{#if isRunning}
 		<!-- Live progress -->

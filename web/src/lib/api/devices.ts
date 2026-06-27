@@ -20,5 +20,8 @@ export const devicesApi = {
 	wipe: (deviceId: string) => apiPost<{ wiped: boolean; deletedFiles: number }>(`/devices/${deviceId}/wipe`),
 	/** Set the ordered list of playlists assigned to a device (= sync order). */
 	setPlaylistOrder: (deviceId: string, playlistIds: string[]) =>
-		apiPost<Device>(`/devices/${deviceId}/order`, { playlistIds })
+		apiPost<Device>(`/devices/${deviceId}/order`, { playlistIds }),
+	/** Toggle a GROUP assignment on a device (syncs all playlists in the group). */
+	toggleGroup: (deviceId: string, groupId: string) =>
+		apiPost<Device>(`/devices/${deviceId}/groups/${groupId}`)
 };
