@@ -6,6 +6,7 @@
 	import RegisterMountDialog from '$lib/components/devices/register-mount-dialog.svelte';
 	import DeviceSyncPanel from '$lib/components/devices/device-sync-panel.svelte';
 	import SyncDiff from '$lib/components/devices/sync-diff.svelte';
+	import DeviceSnapshot from '$lib/components/devices/device-snapshot.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
@@ -152,26 +153,55 @@
 
 {#if selected}
 	<Dialog.Root open onOpenChange={(o) => !o && (selectedId = null)}>
-		<Dialog.Content class="max-w-lg max-h-[85vh] overflow-y-auto">
-			<Dialog.Header>
-				<Dialog.Title>{selected.name}</Dialog.Title>
-				<Dialog.Description>Manage playlists and sync this device.</Dialog.Description>
-			</Dialog.Header>
-			<DeviceSyncPanel
-				device={selected}
-				{playlists}
-				{groups}
-				onAssignmentChanged={onAssignmentChanged}
-			/>
-			{#if selected.identity?.snapshot}
-				<div class="border-t pt-3">
-					<SyncDiff
-						identity={selected.identity}
-						playlists={resolvedPlaylists}
-						tracks={resolvedTracks}
+		<Dialog.Content class="max-w-[96vw] sm:max-w-6xl max-h-[92vh] overflow-hidden p-0">
+			<!-- Header: fixed across the top -->
+			<div class="border-b px-6 py-4">
+				<div class="flex items-center justify-between">
+					<h2 class="text-lg font-semibold">{selected.name}</h2>
+					<Dialog.Close />
+				</div>
+				<div class="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
+					{#if selected.totalBytes}
+						<span>{((selected.totalBytes - (selected.freeBytes ?? 0)) / 1048576).toFixed(1)} MB used</span>
+						<span>·</span>
+						<span>{((selected.freeBytes ?? 0) / 1048576).toFixed(0)} MB free</span>
+					{/if}
+					{#if selected.lastSyncAt}
+						<span>·</span>
+						<span>Last synced {selected.lastSyncAt.slice(0, 10)}</span>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Two columns, each scrolls independently -->
+			<div class="grid grid-cols-2 gap-0 max-h-[calc(92vh-5rem)]">
+				<!-- LEFT: controls -->
+				<div class="overflow-y-auto border-r px-6 py-4">
+					<DeviceSyncPanel
+						device={selected}
+						{playlists}
+						{groups}
+						onAssignmentChanged={onAssignmentChanged}
 					/>
 				</div>
-			{/if}
+
+				<!-- RIGHT: state (snapshot + diff) -->
+				<div class="overflow-y-auto px-6 py-4">
+					<h3 class="mb-3 text-sm font-medium">On device</h3>
+					<DeviceSnapshot identity={selected.identity} />
+
+					{#if selected.identity?.snapshot}
+						<div class="mt-4">
+							<h3 class="mb-3 text-sm font-medium">Sync diff</h3>
+							<SyncDiff
+								identity={selected.identity}
+								playlists={resolvedPlaylists}
+								tracks={resolvedTracks}
+							/>
+						</div>
+					{/if}
+				</div>
+			</div>
 		</Dialog.Content>
 	</Dialog.Root>
 {/if}

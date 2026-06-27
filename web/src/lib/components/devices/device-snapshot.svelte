@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
 	import type { DeviceIdentity } from '$lib/api';
 
-	/** Shows the last-sync snapshot from the device's identity file — exactly
-	 * what's recorded on the device, grouped by playlist. */
 	let { identity }: { identity?: DeviceIdentity | null } = $props();
 
 	const snap = $derived(identity?.snapshot ?? null);
@@ -21,7 +18,7 @@
 			{/if}
 		</div>
 
-		<ScrollArea class="max-h-64 rounded-md border">
+		<div class="max-h-64 overflow-y-auto rounded-md border">
 			<div class="divide-y">
 				{#each snap.playlists as pl (pl.id)}
 					<details class="group">
@@ -40,7 +37,7 @@
 					</details>
 				{/each}
 			</div>
-		</ScrollArea>
+		</div>
 	</div>
 {:else}
 	<div class="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
