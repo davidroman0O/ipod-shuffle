@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { devicesApi, playlistsApi, type Device, type Playlist } from '$lib/api';
+	import { devicesApi, playlistsApi, type Device, type Playlist, type Track } from '$lib/api';
 	import DeviceCard from '$lib/components/devices/device-card.svelte';
 	import RegisterMountDialog from '$lib/components/devices/register-mount-dialog.svelte';
 	import DeviceSyncPanel from '$lib/components/devices/device-sync-panel.svelte';
+	import SyncDiff from '$lib/components/devices/sync-diff.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
@@ -16,6 +17,8 @@
 	let loading = $state(true);
 	let refreshing = $state(false);
 	let selectedId = $state<string | null>(null);
+	let resolvedTracks = $state<Track[]>([]);
+	let resolvedPlaylists = $state<Playlist[]>([]);
 
 	// Derived from the live devices array so the modal always shows fresh data
 	// (e.g. after toggling a playlist assignment inside the modal).
@@ -60,8 +63,28 @@
 		}
 	}
 
-	function openDetail(device: Device) {
+	async function openDetail(device: Device) {
 		selectedId = device.id;
+		// Fetch what WOULD sync so the diff component can compare.
+		try {
+			const { syncApi, tracksApi } = await import('$lib/api');
+			const resolved = await syncApi.resolve(device.id);
+			// Resolve the track ids from the union into full docs.
+			const trackIds = resolved.tracks.map((t: { trackId: string }) => t.trackId);
+			if (trackIds.length) {
+				resolvedTracks = await tracksApi.list();
+				resolvedPlaylists = (resolved.playlists ?? []).map((p: { playlistId: string; name: string; trackIds: string[] }) => ({
+					id: p.playlistId, name: p.name, trackIds: p.trackIds, position: 0,
+					groupId: null, aliasOf: null, createdAt: '', updatedAt: ''
+				})) as Playlist[];
+			} else {
+				resolvedTracks = [];
+				resolvedPlaylists = [];
+			}
+		} catch {
+			resolvedTracks = [];
+			resolvedPlaylists = [];
+		}
 	}
 
 	function onAssignmentChanged() {
@@ -127,7 +150,7 @@
 
 {#if selected}
 	<Dialog.Root open onOpenChange={(o) => !o && (selectedId = null)}>
-		<Dialog.Content class="max-w-lg">
+		<Dialog.Content class="max-w-lg max-h-[85vh] overflow-y-auto">
 			<Dialog.Header>
 				<Dialog.Title>{selected.name}</Dialog.Title>
 				<Dialog.Description>Manage playlists and sync this device.</Dialog.Description>
@@ -137,6 +160,15 @@
 				{playlists}
 				onAssignmentChanged={onAssignmentChanged}
 			/>
+			{#if selected.identity?.snapshot}
+				<div class="border-t pt-3">
+					<SyncDiff
+						identity={selected.identity}
+						playlists={resolvedPlaylists}
+						tracks={resolvedTracks}
+					/>
+				</div>
+			{/if}
 		</Dialog.Content>
 	</Dialog.Root>
 {/if}

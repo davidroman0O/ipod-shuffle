@@ -2,7 +2,7 @@
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import { toast } from 'svelte-sonner';
-	import { type Device, type Playlist, type SyncPlan, type SyncJobStatus, syncApi } from '$lib/api';
+	import { type Device, type Playlist, type SyncPlan, type SyncJobStatus, syncApi, devicesApi } from '$lib/api';
 	import PlaylistAssignmentList from './playlist-assignment-list.svelte';
 	import SyncPlanSummary from './sync-plan-summary.svelte';
 	import DeviceSnapshot from './device-snapshot.svelte';
@@ -96,6 +96,21 @@
 		onAssignmentChanged?.();
 		plan = null;
 	}
+
+	let wiping = $state(false);
+
+	async function handleWipe() {
+		wiping = true;
+		try {
+			const result = await devicesApi.wipe(device.id);
+			toast.success('Device wiped', { description: `${result.deletedFiles} files deleted` });
+			onAssignmentChanged?.();
+		} catch (e) {
+			toast.error('Wipe failed', { description: (e as Error).message });
+		} finally {
+			wiping = false;
+		}
+	}
 </script>
 
 <div class="space-y-4">
@@ -136,5 +151,23 @@
 
 	{#if !isRunning}
 		<DeviceSnapshot identity={device.identity} />
+	{/if}
+
+	<!-- Wipe — destructive, confirmed -->
+	{#if !isRunning}
+		<div class="flex justify-end border-t pt-3">
+			<Button
+				variant="ghost"
+				size="sm"
+				class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+				onclick={() => {
+					if (confirm(`Wipe ALL music from "${device.name}"? This permanently deletes every track and playlist on the device. This cannot be undone.`)) {
+						handleWipe();
+					}
+				}}
+			>
+				Wipe device
+			</Button>
+		</div>
 	{/if}
 </div>

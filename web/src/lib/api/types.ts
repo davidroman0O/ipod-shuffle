@@ -24,6 +24,18 @@ export interface Playlist {
 	trackIds: string[];
 	/** List display/sync ordering; lower sorts first. */
 	position: number;
+	/** Group this playlist belongs to (null = ungrouped). */
+	groupId: string | null;
+	/** If set, this is an alias mirroring another playlist's tracks. */
+	aliasOf: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface PlaylistGroup {
+	id: string;
+	name: string;
+	position: number;
 	createdAt: string;
 	updatedAt: string;
 }

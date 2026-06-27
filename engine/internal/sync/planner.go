@@ -13,6 +13,9 @@ import (
 // mount root.
 const musicRoot = "iPod_Control/Music"
 
+// MusicDirPath returns the on-device music directory (relative to the mount).
+func MusicDirPath() string { return musicRoot }
+
 // Plan computes the set of copy/skip/delete operations needed to make the
 // device at mountPath match the given tracks and playlists. It performs no
 // writes. Mirrors planDeviceSync + computeFileActions in the TS reference.

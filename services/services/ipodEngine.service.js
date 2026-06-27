@@ -78,6 +78,15 @@ module.exports = {
 			}
 		},
 
+		/** Wipe all audio from a device (writes empty DBs + deletes files). */
+		wipe: {
+			params: { mountPath: { type: "string", required: true } },
+			/** @param {Context} ctx */
+			async handler(ctx) {
+				return this.engine.wipe(ctx.params.mountPath);
+			}
+		},
+
 		/** Execute a sync against a device (writes iTunesSD/iTunesStats). */
 		sync: {
 			params: {

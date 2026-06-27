@@ -64,6 +64,11 @@ class EngineClient {
 		return this.#postJson("/v1/devices/identity", { mountPath, name, id });
 	}
 
+	/** POST /v1/devices/wipe — erase all audio from the device. */
+	async wipe(mountPath) {
+		return this.#postJson("/v1/devices/wipe", { mountPath });
+	}
+
 	async #getJson(path) {
 		const res = await this.#do(path, "GET");
 		return this.#parse(res);

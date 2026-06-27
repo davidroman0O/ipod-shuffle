@@ -16,6 +16,8 @@ export const devicesApi = {
 	remove: (deviceId: string) => apiFetch<string | null>(`/devices/${deviceId}`, { method: 'DELETE' }),
 	/** Name a device (writes identity to the device + updates DB). */
 	name: (deviceId: string, name: string) => apiPost<Device>(`/devices/${deviceId}/name`, { name }),
+	/** Wipe all audio from a device. */
+	wipe: (deviceId: string) => apiPost<{ wiped: boolean; deletedFiles: number }>(`/devices/${deviceId}/wipe`),
 	/** Set the ordered list of playlists assigned to a device (= sync order). */
 	setPlaylistOrder: (deviceId: string, playlistIds: string[]) =>
 		apiPost<Device>(`/devices/${deviceId}/order`, { playlistIds })

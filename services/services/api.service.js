@@ -40,6 +40,7 @@ module.exports = {
 					"POST /devices/:deviceId/name": "ipodDevices.name",
 					"GET /devices/:deviceId/online": "ipodDevices.isOnline",
 					"DELETE /devices/:deviceId": "ipodDevices.remove",
+					"POST /devices/:deviceId/wipe": "ipodDevices.wipe",
 
 					// Library — roots & tracks.
 					"GET /library/roots": "ipodLibrary.listRoots",

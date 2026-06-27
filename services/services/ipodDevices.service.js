@@ -172,6 +172,25 @@ module.exports = {
 			}
 		},
 
+		/** Wipe all audio from a device. */
+		wipe: {
+			params: { deviceId: { type: "string", required: true } },
+			async handler(ctx) {
+				const device = await ctx.call("ipodDevicesDb.get", { id: ctx.params.deviceId });
+				if (!device) throw new MoleculerError("Device not found.", 404);
+				if (!device.lastKnownMountPath) throw new MoleculerError("Device is not mounted.", 409);
+				const result = await ctx.call("ipodEngine.wipe", { mountPath: device.lastKnownMountPath });
+				// Clear the device record's manifest + lastSyncAt.
+				await ctx.call("ipodDevicesDb.update", {
+					id: ctx.params.deviceId,
+					manifest: [],
+					lastSyncAt: null
+				});
+				await ctx.emit("ipod.devices.wiped", { deviceId: ctx.params.deviceId });
+				return result;
+			}
+		},
+
 		/** Name a device: writes identity to the device + updates the DB name. */
 		name: {
 			params: {

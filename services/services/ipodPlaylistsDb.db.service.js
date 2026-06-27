@@ -212,7 +212,9 @@ module.exports = {
 		listByGroup: {
 			params: { groupId: { type: "string", required: true } },
 			async handler(ctx) {
-				return this.findEntities(ctx, { query: { groupId: ctx.params.groupId } });
+				const docs = await this.findEntities(ctx, { query: { groupId: ctx.params.groupId } });
+				// Sort by position so group expansion preserves the user's ordering.
+				return docs.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 			}
 		},
 

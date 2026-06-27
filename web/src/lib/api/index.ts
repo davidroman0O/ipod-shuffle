@@ -8,6 +8,7 @@ export { devicesApi } from './devices';
 export { libraryApi } from './library';
 export { tracksApi } from './tracks';
 export { playlistsApi } from './playlists';
+export { groupsApi } from './groups';
 export { syncApi } from './sync';
 export { fsApi } from './fs';
 export { isSupportedAudioPath, normalizeAudioExtension } from './audio';

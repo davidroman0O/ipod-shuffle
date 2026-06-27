@@ -23,5 +23,14 @@ export const playlistsApi = {
 	insertTracks: (id: string, trackIds: string[], position: number) =>
 		apiPost<Playlist>(`/playlists/${id}/insert`, { trackIds, position }),
 	addTrack: (id: string, trackId: string) => apiPost<Playlist>(`/playlists/${id}/tracks/${trackId}`),
-	removeTrack: (id: string, trackId: string) => apiDelete<Playlist>(`/playlists/${id}/tracks/${trackId}`)
+	removeTrack: (id: string, trackId: string) => apiDelete<Playlist>(`/playlists/${id}/tracks/${trackId}`),
+	/** Clone a playlist (deep-copy trackIds into an independent playlist). */
+	clone: (id: string, name?: string, groupId?: string | null) =>
+		apiPost<Playlist>(`/playlists/${id}/clone`, { name, groupId }),
+	/** Create an alias (mirrors source, no own tracks). */
+	alias: (sourceId: string, groupId?: string | null, name?: string) =>
+		apiPost<Playlist>(`/playlists/${sourceId}/alias`, { groupId, name }),
+	/** Move a playlist to a group (null = ungrouped). */
+	moveToGroup: (id: string, groupId: string | null) =>
+		apiFetch<Playlist>(`/playlists/${id}/group`, { method: 'PATCH', body: JSON.stringify({ groupId }) })
 };
