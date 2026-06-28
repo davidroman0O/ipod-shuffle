@@ -1,4 +1,4 @@
-import { apiFetch, apiPost, apiDelete } from './client';
+import { apiFetch, apiPost, apiDelete, apiPatch } from './client';
 import type { Playlist } from './types';
 
 export const playlistsApi = {
@@ -8,7 +8,7 @@ export const playlistsApi = {
 	create: (name: string) => apiPost<Playlist>('/playlists', { name }),
 	/** Rename a playlist (normalised + unique). */
 	rename: (id: string, name: string) =>
-		apiFetch<Playlist>(`/playlists/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+		apiPatch<Playlist>(`/playlists/${id}`, { name }),
 	/** Delete a playlist and clear its assignment on every device. */
 	remove: (id: string) => apiDelete<string | null>(`/playlists/${id}`),
 	/** Reorder the playlist list itself (full ordered id list). */
@@ -32,5 +32,5 @@ export const playlistsApi = {
 		apiPost<Playlist>(`/playlists/${sourceId}/alias`, { groupId, name }),
 	/** Move a playlist to a group (null = ungrouped). */
 	moveToGroup: (id: string, groupId: string | null) =>
-		apiFetch<Playlist>(`/playlists/${id}/group`, { method: 'PATCH', body: JSON.stringify({ groupId }) })
+		apiPatch<Playlist>(`/playlists/${id}/group`, { groupId })
 };

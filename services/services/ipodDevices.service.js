@@ -301,65 +301,9 @@ module.exports = {
 			// Build the on-device snapshot from the live identity.
 			const onDevice = liveIdentity?.snapshot || null;
 
-			// If the DB has no assignments but the identity snapshot has playlists,
-			// derive effective assignments from the snapshot so the UI shows what's
-			// on the device pre-selected. This handles wipe/re-mount scenarios.
-			let effectiveAssignedIds = [...assignedIds];
-			if (effectiveAssignedIds.length === 0 && onDevice && onDevice.playlists) {
-				for (const snapPl of onDevice.playlists) {
-					// Match snapshot playlist IDs to our playlist records.
-					if (allPlaylists.find((p) => p.id === snapPl.id) && !effectiveAssignedIds.includes(snapPl.id)) {
-						effectiveAssignedIds.push(snapPl.id);
-					}
-				}
-			}
-
-			// Rebuild the tree with effective assignments.
-			const effectiveAssignedGroups = [];
-			for (const g of allGroups) {
-				const members = allPlaylists.filter((p) => p.groupId === g.id);
-				const allAssigned = members.every((p) => effectiveAssignedIds.includes(p.id));
-				if (allAssigned && members.length > 0) effectiveAssignedGroups.push(g.id);
-			}
-			// Rebuild tree with effective assignments.
-			const effectiveTree = [];
-			for (const g of allGroups) {
-				effectiveTree.push({
-					id: g.id,
-					name: g.name,
-					type: "group",
-					assigned: effectiveAssignedGroups.includes(g.id),
-					playlists: allPlaylists
-						.filter((p) => p.groupId === g.id)
-						.map((p) => ({
-							id: p.id,
-							name: p.name,
-							aliasOf: p.aliasOf || null,
-							trackCount: (p.trackIds || []).length,
-							assigned: effectiveAssignedIds.includes(p.id),
-							viaGroup: effectiveAssignedGroups.includes(g.id),
-							effective: effectiveAssignedIds.includes(p.id) || effectiveAssignedGroups.includes(g.id)
-						}))
-				});
-			}
-			const effUngrouped = allPlaylists.filter((p) => !p.groupId);
-			if (effUngrouped.length > 0) {
-				effectiveTree.push({
-					id: null,
-					name: "Ungrouped",
-					type: "ungrouped",
-					assigned: false,
-					playlists: effUngrouped.map((p) => ({
-						id: p.id,
-						name: p.name,
-						aliasOf: p.aliasOf || null,
-						trackCount: (p.trackIds || []).length,
-						assigned: effectiveAssignedIds.includes(p.id),
-						viaGroup: false,
-						effective: effectiveAssignedIds.includes(p.id)
-					}))
-				});
-			}
+			// Use the actual DB assignments — no pre-selection derivation.
+			// The snapshot is for display ("what was on the device last sync"),
+			// not for guessing assignments.
 
 			// Compute the diff server-side.
 			const { computeDiff } = require("../lib/diff");
@@ -376,9 +320,9 @@ module.exports = {
 					lastKnownMountPath: device.lastKnownMountPath || null
 				},
 				assignments: {
-					tree: effectiveTree.length > 0 ? effectiveTree : tree,
-					assignedPlaylistIds: effectiveAssignedIds,
-					assignedGroupIds: effectiveAssignedGroups
+					tree: tree,
+					assignedPlaylistIds: assignedIds,
+					assignedGroupIds: assignedGroups
 				},
 				onDevice,
 				diff,

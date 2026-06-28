@@ -2,8 +2,9 @@
  * Low-level fetch helper for the Moleculer gateway. Every API module goes
  * through here so error handling + base URL are centralised.
  *
- * The gateway URL defaults to the local-dev api service; override with
- * VITE_API_BASE_URL when the node runs elsewhere.
+ * Handles RFC 9457 Problem Details error responses from the API gateway:
+ * extracts `detail` as the human-readable error message, captures `requestId`
+ * for tracing, and preserves the full body for inspection.
  */
 
 /**
@@ -20,7 +21,8 @@ export class ApiError extends Error {
 	constructor(
 		public status: number,
 		message: string,
-		public body?: unknown
+		public body?: unknown,
+		public requestId?: string
 	) {
 		super(message);
 		this.name = 'ApiError';
@@ -41,13 +43,34 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 			body = text;
 		}
 	}
+
+	// Capture request ID from response header (for tracing/debugging).
+	const requestId = res.headers.get('X-Request-Id') ?? undefined;
+
 	if (!res.ok) {
-		const message =
-			(typeof body === 'object' && body && 'message' in body
-				? String((body as { message: unknown }).message)
-				: `request failed: ${res.status}`) ?? `request failed: ${res.status}`;
-		throw new ApiError(res.status, message, body);
+		// Extract human-readable message from RFC 9457 Problem Details.
+		// Falls back to legacy `message` field or a generic status message.
+		let message: string;
+		if (typeof body === 'object' && body !== null) {
+			const obj = body as Record<string, unknown>;
+			// RFC 9457: `detail` is the human-readable explanation.
+			if (typeof obj.detail === 'string') {
+				message = obj.detail;
+			}
+			// Legacy moleculer-web: `message` field.
+			else if (typeof obj.message === 'string') {
+				message = obj.message;
+			}
+			// Fallback: just the status.
+			else {
+				message = `request failed: ${res.status}`;
+			}
+		} else {
+			message = `request failed: ${res.status}`;
+		}
+		throw new ApiError(res.status, message, body, requestId);
 	}
+
 	return body as T;
 }
 
@@ -60,4 +83,12 @@ export async function apiPost<T>(path: string, payload?: unknown): Promise<T> {
 
 export async function apiDelete<T>(path: string): Promise<T> {
 	return apiFetch<T>(path, { method: 'DELETE' });
+}
+
+/** PATCH helper — for partial updates. */
+export async function apiPatch<T>(path: string, payload?: unknown): Promise<T> {
+	return apiFetch<T>(path, {
+		method: 'PATCH',
+		body: payload === undefined ? undefined : JSON.stringify(payload)
+	});
 }

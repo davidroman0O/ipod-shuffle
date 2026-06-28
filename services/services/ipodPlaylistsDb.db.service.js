@@ -163,12 +163,15 @@ module.exports = {
 		 */
 		alias: {
 			params: {
-				sourceId: { type: "string", required: true },
+				sourceId: { type: "string", optional: true },
+				id: { type: "string", optional: true },
 				groupId: { type: "string", optional: true },
 				name: { type: "string", optional: true }
 			},
 			async handler(ctx) {
-				return this.createAlias(ctx, ctx.params.sourceId, ctx.params.groupId, ctx.params.name);
+				const sourceId = ctx.params.sourceId || ctx.params.id;
+				if (!sourceId) throw new MoleculerError("sourceId or id is required.", 422);
+				return this.createAlias(ctx, sourceId, ctx.params.groupId, ctx.params.name);
 			}
 		},
 
